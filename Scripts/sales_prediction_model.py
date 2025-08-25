@@ -183,13 +183,43 @@ def predict_demand():
 
     model = joblib.load("demand_prediction_model.pkl")
     scaler = joblib.load("demand_scaler.pkl")
-    x_column = joblib.load("demand_x_columns.pkl")
+    x_columns = joblib.load("demand_x_columns.pkl")
 
     df_train = fetch_data()
     numeric_features = ['UnitPrice', 'UnitPriceDiscount']
     categorical_features = ['ProductKey', 'CustomerKey', 'TerritoryKey', 'SalesPersonKey']
 
-    avg
+    avg_numeric = df_train[numeric_features].mean().to_dict()
+    top_cats = {col: df_train[col].mode()[0] for col in categorical_features}
+
+    df_train['OrderDateKey'] = pd.to_datetime(df_train['OrderDateKey'])
+    last_year = df_train['OrderDateKey'].dt.year.max()
+    last_month = df_train['OrderDateKey'].dt.month.max()
+
+    if year and month:
+        start_year = int(year)
+        start_month = int(month)
+    else:
+        start_year = last_year
+        start_month = last_month
+
+    future_dates = []
+    for i in range(1, months_ahead + 1):
+        month_num = start_month + i
+        year_num = ((month_num -1) % 12 ) + 1
+        future_dates.append((year_num, month_num))
+    
+    x_future_rows = []
+    for y_val, m_val in future_dates:
+        x_numertic_df = pd.DataFrame([avg_numeric])
+        x_cateogrical_df = pd.DataFrame({f"{col}_{val}": [1] for col, val in top_cats.items()})
+        x_time_df = pd.DataFrame({'OrderYear': [y_val], 'OrderMonth': [m_val], 'OrderDay': [1]})
+        x_row = pd.concat([x_numertic_df, x_cateogrical_df, x_time_df], axis=1).fillna(0)
+        for col in x_columns:
+            if col not in x+row.columns:
+                x_row[col] = 0
+        x_row = x_row[x_columns]
+        x
 
 # Run app
 if __name__ == '__main__':
