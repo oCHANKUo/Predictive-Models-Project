@@ -5,6 +5,9 @@ import pyodbc
 from sklearn import linear_model
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
+import joblib
 
 model = linear_model.LinearRegression()
 scaler = StandardScaler()
@@ -70,23 +73,25 @@ time_features = ['OrderYear', 'OrderMonth', 'OrderDay']
 X_time = df[time_features]
 
 X = pd.concat([X_numeric, X_categorical, X_time], axis=1)
-
+X = X.fillna(0)
 
 #Funtion to train the model
-train = df[df['OrderDateKey'] < '2012-01-01']
-test = df[df['OrderDateKey'] >= '2012-01-01']
-
-X_train = X.loc[train.index]
-X_test = X.loc[test.index]
-y_train = y.loc[train.index]
-y_test = y.loc[test.index]
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
 
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 model.fit(X_train_scaled, y_train)
 
+joblib.dump(model, "sales_prediction_model.pkl")
+joblib.dump(scaler, "scaler.pkl")
+
 
 # Prediction
+y_pred = model.predict(X_test_scaled)
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
 
-print(X_time.head())
+print(f"MSE: {mse}, R2: {r2}")
