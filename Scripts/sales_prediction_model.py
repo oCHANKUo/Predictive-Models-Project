@@ -11,9 +11,7 @@ MODEL_FILE = "sales_prediction_model.pkl"
 SCALER_FILE = "scaler.pkl"
 X_COLUMNS_FILE = "X_columns.pkl"
 
-# ------------------------
 # Database connection
-# ------------------------
 def get_connection():
     conn = pyodbc.connect(
         "DRIVER={ODBC Driver 17 for SQL Server};"
@@ -24,9 +22,7 @@ def get_connection():
     )
     return conn
 
-# ------------------------
 # Fetch data
-# ------------------------
 def fetch_data():
     query = """
     SELECT LineTotal,
@@ -45,9 +41,7 @@ def fetch_data():
     conn.close()
     return df
 
-# ------------------------
 # Train model endpoint
-# ------------------------
 @app.route('/train_sales', methods=['POST', 'GET'])
 def train_model():
     df = fetch_data()
@@ -80,9 +74,7 @@ def train_model():
     
     return jsonify({"message": "Linear Regression model trained successfully"})
 
-# ------------------------
 # Prediction endpoint
-# ------------------------
 @app.route('/predict_sales', methods=['GET'])
 def predict_sales():
     months_ahead = int(request.args.get("months", 6))  # default 6 months
@@ -147,8 +139,6 @@ def predict_sales():
     
     return jsonify(results)
 
-# ------------------------
 # Run app
-# ------------------------
 if __name__ == '__main__':
     app.run(debug=True)
