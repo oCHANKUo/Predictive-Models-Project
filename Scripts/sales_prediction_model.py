@@ -6,6 +6,7 @@ from sklearn import linear_model
 import pandas as pd
 
 # First import data
+# Function to connect to the database
 def get_connection():
     conn = pyodbc.connect(
         "DRIVER={ODBC Driver 17 for SQL Server};"
@@ -16,6 +17,7 @@ def get_connection():
     )
     return conn
 
+# Function to import the data, it will connect using the previous function
 def get_data():
     conn = get_connection()
     query = """
@@ -34,6 +36,27 @@ def get_data():
     conn.close()
     return df
 
+target = 'LineTotal'
+y = df[target]
 
+numeric_features = [
+    'OrderQty', 
+    'UnitPrice', 
+    'UnitPriceDiscount'
+]
+X_numeric = df[numeric_features]
+
+categorical_features = ['ProductKey', 
+                        'CustomerKey', 
+                        'TerritoryKey', 
+                        'SalesPersonKey']
+X_categorical = pd.get_dummies(df[categorical_features], drop_first=True)
+
+df['OrderDateKey'] = pd.to_datetime(df['OrderDateKey'])
+
+# Extract year, month, day, day of week, quarter
+df['OrderYear'] = df['OrderDateKey'].dt.year
+df['OrderMonth'] = df['OrderDateKey'].dt.month
+df['OrderDay'] = df['OrderDateKey'].dt.day
 
 model = linear_model.LinearRegression()
