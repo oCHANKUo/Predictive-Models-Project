@@ -4,8 +4,10 @@
 import pyodbc 
 from sklearn import linear_model
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 model = linear_model.LinearRegression()
+scaler = StandardScaler()
 
 # First import data
 # Function to connect to the database
@@ -68,5 +70,23 @@ time_features = ['OrderYear', 'OrderMonth', 'OrderDay']
 X_time = df[time_features]
 
 X = pd.concat([X_numeric, X_categorical, X_time], axis=1)
+
+
+#Funtion to train the model
+train = df[df['OrderDateKey'] < '2012-01-01']
+test = df[df['OrderDateKey'] >= '2012-01-01']
+
+X_train = X.loc[train.index]
+X_test = X.loc[test.index]
+y_train = y.loc[train.index]
+y_test = y.loc[test.index]
+
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+model.fit(X_train_scaled, y_train)
+
+
+# Prediction
 
 print(X_time.head())
