@@ -104,7 +104,7 @@ def train_demand():
 
     # Save the demand model
     joblib.dump(model, "demand_prediction_model.pkl")
-    joblib.dump(scaler "demand_scaler.pkl")
+    joblib.dump(scaler, "demand_scaler.pkl")
     joblib.dump(x.columns, "demand_x_columns.pkl")
 
     return jsonify({"message": "Demand prediction model trained successfully"})
@@ -216,10 +216,21 @@ def predict_demand():
         x_time_df = pd.DataFrame({'OrderYear': [y_val], 'OrderMonth': [m_val], 'OrderDay': [1]})
         x_row = pd.concat([x_numertic_df, x_cateogrical_df, x_time_df], axis=1).fillna(0)
         for col in x_columns:
-            if col not in x+row.columns:
+            if col not in x_row.columns:
                 x_row[col] = 0
         x_row = x_row[x_columns]
-        x
+        x_future_rows.append(x_row)
+
+    x_future = pd.concat(x_future_rows, ignore_index=True)
+    x_scaled = scaler.transform(x_future)
+    preds = model.predict(x_scaled)
+
+    results = [
+        {"Year": int(y_val), "Month": int(m_val), "PredictedDemand": float(round(preds[i], 2))}
+        for i, (y_val, m_val) in enumerate(future_dates)
+    ]
+
+    return results
 
 # Run app
 if __name__ == '__main__':
