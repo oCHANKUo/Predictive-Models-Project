@@ -74,6 +74,41 @@ def train_model():
     
     return jsonify({"message": "Linear Regression model trained successfully"})
 
+
+# Train demand
+@app.route('/train_demand', methods=['POST', 'GET'])
+def train_demand():
+    df = fetch_data()
+
+    # target: product quantity 
+    y = df['OrderQty']
+    numeric_features = ['UnitPrice', 'UnitPriceDiscount']
+    x_numeric = df[numeric_features]
+
+    categorical_features = ['UnitPrice', 'UnitPriceDiscount']
+    x_categorical = pd.get_dummies(df[categorical_features], drop_first=True)
+
+    df['OrderDateKey'] = pd.to_datetime(df['OrderDateKey'])
+    df['OrderYear'] = df['OrderDateKey'].dt.year
+    df['OrderMonth'] = df['OrderDateKey'].dt.month
+    df['OrderDay'] = df['OrderDateKey'].dt.day
+    x_time = df[['OrderYear', 'OrderMonth', 'OrderDay']]
+
+    x = pd.concat([x_numeric, x_categorical, x_time], axis=1).fillna(0)
+
+    scaler = StandardScaler()
+    x_scaled = scaler.fit_transform(x)
+    
+    model = LinearRegression()
+    model.fit(x_scaled, y)
+
+    # Save the demand model
+    joblib.dump(model, "demand_prediction_model.pkl")
+    joblib.dump(scaler "demand_scaler.pkl")
+    joblib.dump(x.columns, "demand_x_columns.pkl")
+
+    return jsonify({"message": "Demand prediction model trained successfully"})
+
 # Prediction endpoint
 @app.route('/predict_sales', methods=['GET'])
 def predict_sales():
@@ -138,6 +173,23 @@ def predict_sales():
     ]
     
     return jsonify(results)
+
+# Product Demand Predictions
+@app.route('/predict_demand', methods=['GET'])
+def predict_demand():
+    months_ahead = int(request.args.get("months", 6))
+    year = request.args.get("year", None)
+    month = request.args.get("month", None)
+
+    model = joblib.load("demand_prediction_model.pkl")
+    scaler = joblib.load("demand_scaler.pkl")
+    x_column = joblib.load("demand_x_columns.pkl")
+
+    df_train = fetch_data()
+    numeric_features = ['UnitPrice', 'UnitPriceDiscount']
+    categorical_features = ['ProductKey', 'CustomerKey', 'TerritoryKey', 'SalesPersonKey']
+
+    avg
 
 # Run app
 if __name__ == '__main__':
