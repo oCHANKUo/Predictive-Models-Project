@@ -1,10 +1,10 @@
 from threading import Thread
 
 # Import the apps from your model files
-from sales_model import app as sales_app
-from region_sales_model import app as region_app
-from product_demand_model import app as product_app
-from customer_purchase_model import app as customer_app
+from sales_prediction_model import app as sales_app
+from regional_sales_model import app as region_app
+from demand_model import app as product_app
+from customer_model import app as customer_app
 
 # Define the ports for each app
 PORTS = {
