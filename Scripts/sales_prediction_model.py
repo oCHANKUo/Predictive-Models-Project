@@ -25,16 +25,16 @@ def get_connection():
 # Fetch data
 def fetch_data():
     query = """
-    SELECT LineTotal,
-           OrderQty, 
-           UnitPrice, 
-           UnitPriceDiscount, 
-           ProductKey, 
-           CustomerKey, 
-           TerritoryKey, 
-           SalesPersonKey, 
-           OrderDateKey
-    FROM FactSalesOrderDetail
+    SELECT 
+        d.Year,
+        d.Month,
+        ISNULL(d.Quarter, 0) AS Quarter,
+        ISNULL(d.IsHolidaySL, 0) AS IsHolidaySL,
+        SUM(f.LineTotal) AS TotalSales
+    FROM FactSalesOrderDetail f
+    JOIN DimDate d ON f.OrderDateKey = d.DateKey
+    GROUP BY d.Year, d.Month, d.Quarter, d.IsHolidaySL
+    ORDER BY d.Year, d.Month;
     """
     conn = get_connection()
     df = pd.read_sql(query, conn)
@@ -45,34 +45,35 @@ def fetch_data():
 @app.route('/train_sales', methods=['POST', 'GET'])
 def train_model():
     df = fetch_data()
-    
-    y = df['LineTotal']
-    numeric_features = ['OrderQty', 'UnitPrice', 'UnitPriceDiscount']
-    X_numeric = df[numeric_features]
-    
-    categorical_features = ['ProductKey', 'CustomerKey', 'TerritoryKey', 'SalesPersonKey']
-    X_categorical = pd.get_dummies(df[categorical_features], drop_first=True)
-    
-    df['OrderDateKey'] = pd.to_datetime(df['OrderDateKey'])
-    df['OrderYear'] = df['OrderDateKey'].dt.year
-    df['OrderMonth'] = df['OrderDateKey'].dt.month
-    df['OrderDay'] = df['OrderDateKey'].dt.day
-    X_time = df[['OrderYear', 'OrderMonth', 'OrderDay']]
-    
-    X = pd.concat([X_numeric, X_categorical, X_time], axis=1).fillna(0)
-    
+
+    # Ensure correct datatypes
+    df['Year'] = df['Year'].astype(int)
+    df['Month'] = df['Month'].astype(int)
+    df['Quarter'] = df['Quarter'].astype(int)
+    df['IsHolidaySL'] = df['IsHolidaySL'].astype(int)
+    df['TotalSales'] = df['TotalSales'].astype(float)
+
+    # Continuous month index
+    df['MonthIndex'] = (df['Year'] - df['Year'].min()) * 12 + df['Month']
+
+    # Features and target
+    X = df[['MonthIndex', 'Month', 'Quarter', 'IsHolidaySL']]
+    y = df['TotalSales']
+
+    # Scale features
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
-    
+
+    # Train model (Linear Regression, can swap to RandomForest if needed)
     model = LinearRegression()
     model.fit(X_scaled, y)
-    
-    # Save model, scaler, and columns
+
+    # Save model + scaler
     joblib.dump(model, MODEL_FILE)
     joblib.dump(scaler, SCALER_FILE)
     joblib.dump(X.columns, X_COLUMNS_FILE)
-    
-    return jsonify({"message": "Linear Regression model trained successfully"})
+
+    return jsonify({"message": "Monthly Sales Prediction model trained successfully"})
 
 
 # Train demand
@@ -112,66 +113,55 @@ def train_demand():
 # Prediction endpoint
 @app.route('/predict_sales', methods=['GET'])
 def predict_sales():
-    months_ahead = int(request.args.get("months", 6))  # default 6 months
-    year = request.args.get("year", None)
-    month = request.args.get("month", None)
-    
-    # Load model, scaler, columns
+    months_ahead = int(request.args.get("months", 6))  # default = 6
+
+    # Load model + scaler
     model = joblib.load(MODEL_FILE)
     scaler = joblib.load(SCALER_FILE)
     X_columns = joblib.load(X_COLUMNS_FILE)
-    
-    df_train = fetch_data()
-    numeric_features = ['OrderQty', 'UnitPrice', 'UnitPriceDiscount']
-    categorical_features = ['ProductKey', 'CustomerKey', 'TerritoryKey', 'SalesPersonKey']
-    
-    avg_numeric = df_train[numeric_features].mean().to_dict()
-    top_cats = {col: df_train[col].mode()[0] for col in categorical_features}
-    
-    # Determine starting point
-    df_train['OrderDateKey'] = pd.to_datetime(df_train['OrderDateKey'])
-    last_year = df_train['OrderDateKey'].dt.year.max()
-    last_month = df_train['OrderDateKey'].dt.month.max()
-    
-    # If year/month provided, use that as starting point
-    if year and month:
-        start_year = int(year)
-        start_month = int(month)
-    else:
-        start_year = last_year
-        start_month = last_month
-    
-    # Generate future months
-    future_dates = []
+
+    # Get historical data
+    df = fetch_data()
+    df['Year'] = df['Year'].astype(int)
+    df['Month'] = df['Month'].astype(int)
+
+    # Last known point
+    last_year = df['Year'].max()
+    last_month = df['Month'].max()
+    last_index = ((last_year - df['Year'].min()) * 12 + last_month)
+
+    # Build future dataframe
+    future = pd.DataFrame({"MonthIndex": [last_index + i for i in range(1, months_ahead + 1)]})
+
+    # Calculate Year & Month
+    future_year_month = []
     for i in range(1, months_ahead + 1):
-        month_num = start_month + i
-        year_num = start_year + (month_num - 1) // 12
-        month_num = ((month_num - 1) % 12) + 1
-        future_dates.append((year_num, month_num))
-    
-    # Create DataFrame for prediction
-    X_future_rows = []
-    for y_val, m_val in future_dates:
-        X_numeric_df = pd.DataFrame([avg_numeric])
-        X_categorical_df = pd.DataFrame({f"{col}_{val}": [1] for col, val in top_cats.items()})
-        X_time_df = pd.DataFrame({'OrderYear': [y_val], 'OrderMonth': [m_val], 'OrderDay': [1]})
-        X_row = pd.concat([X_numeric_df, X_categorical_df, X_time_df], axis=1).fillna(0)
-        # Align columns
-        for col in X_columns:
-            if col not in X_row.columns:
-                X_row[col] = 0
-        X_row = X_row[X_columns]
-        X_future_rows.append(X_row)
-    
-    X_future = pd.concat(X_future_rows, ignore_index=True)
-    X_scaled = scaler.transform(X_future)
-    preds = model.predict(X_scaled)
-    
+        month = last_month + i
+        year = last_year + (month - 1) // 12
+        month = ((month - 1) % 12) + 1
+        future_year_month.append((year, month))
+
+    future['Year'] = [y for (y, m) in future_year_month]
+    future['Month'] = [m for (y, m) in future_year_month]
+    future['Quarter'] = ((future['Month'] - 1) // 3 + 1)
+    future['IsHolidaySL'] = 0  # assume not holiday
+
+    # Align columns + scale
+    X_future = future[X_columns]
+    X_future_scaled = scaler.transform(X_future)
+
+    # Predictions
+    preds = model.predict(X_future_scaled)
+
+    # Format results
     results = [
-        {"Year": int(y_val), "Month": int(m_val), "PredictedSales": float(round(preds[i], 2))}
-        for i, (y_val, m_val) in enumerate(future_dates)
+        {"Year": int(future.iloc[i]['Year']),
+         "Month": int(future.iloc[i]['Month']),
+         "Quarter": int(future.iloc[i]['Quarter']),
+         "PredictedSales": round(float(preds[i]), 2)}
+        for i in range(months_ahead)
     ]
-    
+
     return jsonify(results)
 
 # Product Demand Predictions
