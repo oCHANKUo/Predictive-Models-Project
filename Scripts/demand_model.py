@@ -96,9 +96,8 @@ def train_demand():
 
 @app.route("/predict_demand", methods=['GET','POST'])
 def predict_demand():
-    months_ahead = int(request.args.get("months", 6))  # default 6
+    months_ahead = int(request.args.get("months", 6)) 
 
-    # Load artifacts
     with open(MODEL_PATH, "rb") as f:
         model = pickle.load(f)
     with open(SCALER_PATH, "rb") as f:
@@ -106,11 +105,9 @@ def predict_demand():
     with open(COLUMNS_PATH, "rb") as f:
         feature_cols = pickle.load(f)
 
-    # Get history to find last point + MonthIndex baseline
     hist = fetch_monthly_demand()
     hist = add_calendar_features(hist)
 
-    # Determine last (Year, Month) properly
     last_year = hist.loc[hist["Year"].idxmax(), "Year"]
     last_month = hist[hist["Year"] == last_year]["Month"].max()
 
