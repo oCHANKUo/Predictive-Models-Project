@@ -5,11 +5,18 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 import joblib
 import numpy as np
+import os
 
 app = Flask(__name__)
 MODEL_FILE = "sales_prediction_model.pkl"
 SCALER_FILE = "scaler.pkl"
 X_COLUMNS_FILE = "X_columns.pkl"
+
+# Define save paths relative to this file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
+SCALER_FILE = os.path.join(BASE_DIR, "../scaler/scaler.pkl")
+X_COLUMNS_FILE = os.path.join(BASE_DIR, "../columns/X_columns.pkl")
+MODEL_FILE = os.path.join(BASE_DIR, "../models/sales_model.pkl") 
 
 # Database connection
 def get_connection():
