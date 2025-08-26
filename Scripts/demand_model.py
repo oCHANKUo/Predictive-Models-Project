@@ -36,19 +36,19 @@ def fetch_monthly_demand():
     conn = get_connection()
     query = """
         SELECT 
-            d.[Year]            AS Year,
-            d.[Month]           AS Month,
-            ISNULL(d.[Quarter], 0)     AS Quarter,
-            ISNULL(d.[IsHolidaySL], 0) AS IsHolidaySL,
-            SUM(f.[OrderQty])   AS TotalQty
+            d.Year AS Year,
+            d.Month AS Month,
+            ISNULL(d.Quarter, 0) AS Quarter,
+            ISNULL(d.IsHolidaySL, 0) AS IsHolidaySL,
+            SUM(f.OrderQty) AS TotalQty
         FROM FactSalesOrderDetail f
         JOIN DimDate d ON f.OrderDateKey = d.DateKey
-        GROUP BY d.[Year], d.[Month], d.[Quarter], d.[IsHolidaySL]
-        ORDER BY d.[Year], d.[Month];
+        GROUP BY d.Year, d.Month, d.Quarter, d.IsHolidaySL
+        ORDER BY d.Year, d.Month;
     """
     df = pd.read_sql(query, conn)
     conn.close()
-    # enforce dtypes
+
     df["Year"] = df["Year"].astype(int)
     df["Month"] = df["Month"].astype(int)
     df["Quarter"] = df["Quarter"].astype(int)
@@ -57,7 +57,6 @@ def fetch_monthly_demand():
     return df
 
 def add_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
-    # MonthIndex gives a simple linear trend component (still calendar-based, not a lag)
     start_year = df["Year"].min()
     df = df.copy()
     df["MonthIndex"] = (df["Year"] - start_year) * 12 + df["Month"]
@@ -68,20 +67,16 @@ def train_demand():
     df = fetch_monthly_demand()
     df = add_calendar_features(df)
 
-    # Features (calendar-based, no lags)
     feature_cols = ["Year", "Month", "Quarter", "IsHolidaySL", "MonthIndex"]
     X = df[feature_cols]
     y = df["TotalQty"]
 
-    # Scale features
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # Simple, stable baseline; you can swap to Ridge/RandomForest later if desired
     model = LinearRegression()
     model.fit(X_scaled, y)
 
-    # Save artifacts
     with open(MODEL_PATH, "wb") as f:
         pickle.dump(model, f)
     with open(SCALER_PATH, "wb") as f:
@@ -114,7 +109,6 @@ def predict_demand():
     start_year = hist["Year"].min()
     last_index = (last_year - start_year) * 12 + last_month
 
-    # Build future calendar grid
     fut_rows = []
     for i in range(1, months_ahead + 1):
         m = last_month + i
@@ -126,12 +120,11 @@ def predict_demand():
             "Year": int(y),
             "Month": int(m),
             "Quarter": int(q),
-            "IsHolidaySL": 0,      # default assumption; change if you can look up future holidays
+            "IsHolidaySL": 0,      
             "MonthIndex": int(mi),
         })
     future_df = pd.DataFrame(fut_rows)
 
-    # Align, scale, predict
     X_future = future_df[feature_cols]
     X_future_scaled = scaler.transform(X_future)
     preds = model.predict(X_future_scaled)
