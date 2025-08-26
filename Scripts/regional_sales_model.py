@@ -89,20 +89,16 @@ def train_model():
     clf.fit(x_train, y_train)
     y_pred = clf.predict(x_test)
     report = classification_report(y_test, y_pred, output_dict=True)
-
-    # Save classifier
+    
     with open(CLASSIFIER_FILE, "wb") as f:
         pickle.dump(clf, f)
 
-    # Regressor
-    # Optional: scale MonthIndex
     scaler = StandardScaler()
     X_reg_scaled = X_reg.copy()
     X_reg_scaled[['MonthIndex']] = scaler.fit_transform(X_reg[['MonthIndex']])
     reg = RandomForestRegressor(n_estimators=100, random_state=42)
     reg.fit(X_reg_scaled, y_reg)
 
-    # Save regressor, scaler, and columns
     with open(SALES_MODEL_FILE, "wb") as f:
         pickle.dump(reg, f)
     with open(SCALER_FILE, "wb") as f:
@@ -131,7 +127,6 @@ def predict():
 
     df = fetch_data()
     X_cls, y_cls, X_reg, y_reg, pivot = preprocess(df)
-
     last_year = df['Year'].max()
     last_month = df[df['Year']==last_year]['Month'].max()
 
@@ -143,31 +138,23 @@ def predict():
 
     results = []
     for terr in territories:
-        for i in range(1, months_to_predict + 1):
-            # Compute month and year
+        for i in range(1, months_to_predict+1):
             month = last_month + i
-            year = last_year + (month - 1) // 12
-            month = ((month - 1) % 12) + 1
+            year = last_year + (month-1)//12
+            month = ((month-1)%12) + 1
 
-            # ---------------- Class prediction ----------------
+            # Class prediction
             row_cls = pd.DataFrame([terr], columns=['TerritoryName'])
             row_cls = pd.get_dummies(row_cls, drop_first=True)
             row_cls = row_cls.reindex(columns=X_cls.columns, fill_value=0)
             top_category = clf.predict(row_cls)[0]
 
+            # Regression prediction
             row_reg = row_cls.copy()
-
-            month_index = (year - df['Year'].min()) * 12 + month
-            row_reg['MonthIndex'] = month_index
-
-            # Scale MonthIndex
-            row_reg_scaled = row_reg.copy()
-            row_reg_scaled['MonthIndex'] = scaler.transform(row_reg[['MonthIndex']])
-
-            # Align columns for regressor
-            row_reg_scaled = row_reg_scaled.reindex(columns=columns, fill_value=0)
-
-            predicted_sales = reg.predict(row_reg_scaled)[0]
+            month_index = int((year - df['Year'].min())*12 + month)
+            row_reg['MonthIndex'] = scaler.transform([[month_index]])[0][0]  # scale MonthIndex
+            row_reg = row_reg[columns]  # align columns
+            predicted_sales = reg.predict(row_reg)[0]
 
             results.append({
                 "TerritoryName": str(terr),
