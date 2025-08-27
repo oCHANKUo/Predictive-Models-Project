@@ -1,23 +1,33 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState } from "react";
+import SalesModel from "./components/SalesModel";
+import RegionalSalesModel from "./components/RegionalSalesModel";
+import DemandModel from "./components/DemandModel";
+import CustomerModel from "./components/CustomerModel";
+import FilterPanel from "./components/FilterPanel";
 
 function App() {
+  const [filters, setFilters] = useState({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
+    territory: "",
+    topN: 10
+  });
+
+  const handleFilterChange = (name, value) => {
+    setFilters(prev => ({ ...prev, [name]: value }));
+  };
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div style={{ padding: "20px", fontFamily: "Inter, sans-serif" }}>
+      <h1>Predictive Models Dashboard</h1>
+      <FilterPanel filters={filters} onChange={handleFilterChange} />
+
+      <div style={{ marginTop: "30px" }}>
+        <SalesModel filters={filters} />
+        <RegionalSalesModel filters={filters} />
+        <DemandModel filters={filters} />
+        <CustomerModel filters={filters} />
+      </div>
     </div>
   );
 }
