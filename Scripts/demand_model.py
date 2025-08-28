@@ -10,7 +10,6 @@ from sklearn.preprocessing import StandardScaler
 app = Flask(__name__)
 CORS(app)
 
-# -------- Paths (script is in /scripts; siblings: /models, /scaler, /columns)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))       # .../scripts
 ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))    # project root
 MODELS_DIR  = os.path.join(ROOT_DIR, "models")

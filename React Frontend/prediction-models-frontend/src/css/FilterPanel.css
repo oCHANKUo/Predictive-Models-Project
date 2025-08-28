@@ -2,8 +2,8 @@
 
 .filter-panel-container {
   display: flex;
-  flex-wrap: wrap;                /* allow wrapping on smaller screens */
-  justify-content: space-evenly;  /* evenly space all filters horizontally */
+  flex-wrap: wrap;                
+  justify-content: space-evenly;  
   align-items: center;
   padding: 20px;
   margin-bottom: 30px;
@@ -11,14 +11,14 @@
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   font-family: Arial, sans-serif;
-  gap: 20px;                      /* spacing between filters */
+  gap: 20px;                    
 }
 
 .filter-panel-group {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  min-width: 120px;               /* ensures some minimum width for each filter */
+  min-width: 120px;              
 }
 
 .filter-panel-group label {
@@ -32,9 +32,9 @@
   border-radius: 6px;
   border: 1px solid #ccc;
   font-size: 14px;
-  width: 100%;                   /* fill the width of the group */
+  width: 100%;                   
 }
 
 .filter-panel-group input[type="number"] {
-  width: 100%;                   /* same for number inputs */
+  width: 100%;                   
 }

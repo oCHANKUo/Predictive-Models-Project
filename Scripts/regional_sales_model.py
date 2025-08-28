@@ -10,7 +10,6 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-# ---------------- Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
 MODELS_DIR = os.path.join(ROOT_DIR, "models")
@@ -49,10 +48,8 @@ def fetch_data():
     return df
 
 def preprocess(df):
-    # Add MonthIndex for trend
     df['MonthIndex'] = (df['Year'] - df['Year'].min())*12 + df['Month']
 
-    # Features = Territory one-hot + MonthIndex
     X = pd.get_dummies(df[['TerritoryName']], drop_first=True)
     X['MonthIndex'] = df['MonthIndex']
 
@@ -65,7 +62,6 @@ def train_model():
     df = fetch_data()
     X, y, df_proc = preprocess(df)
 
-    # Train regression model
     reg = RandomForestRegressor(n_estimators=200, random_state=42)
     reg.fit(X, y)
 
@@ -83,7 +79,6 @@ def predict():
     if not os.path.exists(SALES_MODEL_FILE):
         return jsonify({"error": "Model not trained yet"}), 400
 
-    # Load model + columns
     with open(SALES_MODEL_FILE, "rb") as f:
         reg = pickle.load(f)
     with open(COLUMN_FILE, "rb") as f:
@@ -94,7 +89,6 @@ def predict():
     last_year = df['Year'].max()
     last_month = df[df['Year']==last_year]['Month'].max()
 
-    # Determine territories
     territory_input = request.form.get("TerritoryName") or request.args.get("TerritoryName")
     data = request.get_json(silent=True)
     territory_input = territory_input or (data.get("TerritoryName") if data else None)
@@ -107,7 +101,6 @@ def predict():
             year = last_year + (month-1)//12
             month = ((month-1)%12) + 1
 
-            # Build row
             row = pd.DataFrame(0, index=[0], columns=columns)
             # Territory encoding
             terr_col = [c for c in columns if terr in c]

@@ -11,7 +11,7 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-# ---------------- Directories
+# Directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.abspath(os.path.join(BASE_DIR, ".."))
 MODELS_DIR = os.path.join(ROOT_DIR, "models")
@@ -60,18 +60,15 @@ def prepare_customer_data(df, fit_scaler=True, scaler=None, columns=None):
     df['Month'] = df['Month'].astype(int)
     df = df.sort_values(by=['CustomerKey', 'Year', 'Month'])
 
-    # Label: did customer purchase next month?
     df['NextPurchase'] = df.groupby('CustomerKey')['PurchaseCount'].shift(-1)
     df['NextPurchase'] = df['NextPurchase'].apply(lambda x: 1 if x > 0 else 0)
     df = df.dropna(subset=['NextPurchase'])
 
-    # Encode categorical variables
     df_encoded = pd.get_dummies(df, columns=['Gender', 'CountryRegionName', 'EmailPromotion'], drop_first=True)
 
     X = df_encoded.drop(columns=['CustomerKey', 'NextPurchase'])
     y = df_encoded['NextPurchase'].astype(int)
 
-    # Scale numeric features
     numeric_cols = ['TotalSpent', 'TotalQuantity', 'Year', 'Month']
     if fit_scaler:
         scaler = StandardScaler()
@@ -79,7 +76,6 @@ def prepare_customer_data(df, fit_scaler=True, scaler=None, columns=None):
     else:
         X[numeric_cols] = scaler.transform(X[numeric_cols])
 
-    # Align columns
     if columns:
         for col in columns:
             if col not in X.columns:
@@ -98,7 +94,6 @@ def train_customer_model():
     model = RandomForestClassifier(n_estimators=100, random_state=42)
     model.fit(X, y)
 
-    # Save model, scaler, and columns
     with open(CUSTOMER_MODEL_FILE, "wb") as f:
         pickle.dump(model, f)
     with open(CUSTOMER_SCALER_FILE, "wb") as f:
@@ -123,15 +118,12 @@ def predict_customer():
     df = fetch_customer_data()
     X, _, full_df, _, _ = prepare_customer_data(df, fit_scaler=False, scaler=scaler, columns=columns)
 
-    # Predict probabilities
     preds = model.predict_proba(X)[:, 1]
     full_df['PurchaseProbability'] = preds
     full_df['Prediction'] = (preds > 0.5).astype(int)
 
-    # Latest month per customer
     latest = full_df.groupby("CustomerKey").tail(1)
 
-    # Query params
     top_n = request.args.get("top_n", default=10, type=int)
     customer_key = request.args.get("customer_key", default=None, type=int)
     if customer_key:

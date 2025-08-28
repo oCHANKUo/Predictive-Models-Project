@@ -19,7 +19,6 @@ SCALER_FILE = os.path.join(BASE_DIR, "../scaler/scaler.pkl")
 X_COLUMNS_FILE = os.path.join(BASE_DIR, "../columns/X_columns.pkl")
 MODEL_FILE = os.path.join(BASE_DIR, "../models/sales_model.pkl") 
 
-# Database connection
 def get_connection():
     conn = pyodbc.connect(
         "DRIVER={ODBC Driver 17 for SQL Server};"
@@ -30,7 +29,6 @@ def get_connection():
     )
     return conn
 
-# Fetch data
 def fetch_data():
     query = """
     SELECT 
@@ -49,26 +47,21 @@ def fetch_data():
     conn.close()
     return df
 
-# Train model endpoint
 @app.route('/train_sales', methods=['POST', 'GET'])
 def train_model():
     df = fetch_data()
 
-    # Ensure correct datatypes
     df['Year'] = df['Year'].astype(int)
     df['Month'] = df['Month'].astype(int)
     df['Quarter'] = df['Quarter'].astype(int)
     df['IsHolidaySL'] = df['IsHolidaySL'].astype(int)
     df['TotalSales'] = df['TotalSales'].astype(float)
 
-    # Continuous month index
     df['MonthIndex'] = (df['Year'] - df['Year'].min()) * 12 + df['Month']
 
-    # Features and target
     X = df[['MonthIndex', 'Month', 'Quarter', 'IsHolidaySL']]
     y = df['TotalSales']
 
-    # Scale features
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
@@ -82,7 +75,6 @@ def train_model():
     return jsonify({"message": "Monthly Sales Prediction model trained successfully"})
 
 
-# Prediction endpoint
 @app.route('/predict_sales', methods=['GET'])
 def predict_sales():
     months_ahead = request.args.get("months", type=int)
@@ -100,7 +92,6 @@ def predict_sales():
     last_month = df['Month'].max()
     last_index = ((last_year - df['Year'].min()) * 12 + last_month)
 
-    # Build future dataframe
     future = pd.DataFrame({"MonthIndex": [last_index + i for i in range(1, months_ahead + 1)]})
 
     future_year_month = []
@@ -113,14 +104,13 @@ def predict_sales():
     future['Year'] = [y for (y, m) in future_year_month]
     future['Month'] = [m for (y, m) in future_year_month]
     future['Quarter'] = ((future['Month'] - 1) // 3 + 1)
-    future['IsHolidaySL'] = 0  # assume not holiday
+    future['IsHolidaySL'] = 0 
 
     X_future = future[X_columns]
     X_future_scaled = scaler.transform(X_future)
 
     preds = model.predict(X_future_scaled)
 
-    # Format results
     results = [
         {"Year": int(future.iloc[i]['Year']),
          "Month": int(future.iloc[i]['Month']),
