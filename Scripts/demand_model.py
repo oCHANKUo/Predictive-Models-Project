@@ -3,10 +3,12 @@ import os
 import pyodbc
 import pickle
 import pandas as pd
+from flask_cors import CORS
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 
 app = Flask(__name__)
+CORS(app)
 
 # -------- Paths (script is in /scripts; siblings: /models, /scaler, /columns)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))       # .../scripts
@@ -138,5 +140,5 @@ def predict_demand():
 
     return jsonify(results)
 
-if __name__ == "__main__":
-    app.run(debug=True)
+# if __name__ == "__main__":
+#   app.run(debug=True)

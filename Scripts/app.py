@@ -14,16 +14,16 @@ PORTS = {
 
 # Functions to run each app
 def run_sales():
-    sales_app.run(port=PORTS['sales'])
+    sales_app.run(port=PORTS['sales'], debug=True, use_reloader=False)
 
 def run_region():
-    region_app.run(port=PORTS['region'])
+    region_app.run(port=PORTS['region'], debug=True, use_reloader=False)
 
 def run_product():
-    product_app.run(port=PORTS['product'])
+    product_app.run(port=PORTS['product'], debug=True, use_reloader=False)
 
 def run_customer():
-    customer_app.run(port=PORTS['customer'])
+    customer_app.run(port=PORTS['customer'], debug=True, use_reloader=False)
 
 # Start all apps in separate threads
 if __name__ == "__main__":
