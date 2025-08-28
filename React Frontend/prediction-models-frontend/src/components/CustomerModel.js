@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import "../css/CustomerModel.css";
 
 function CustomerModel({ filters }) {
   const [results, setResults] = useState([]);
@@ -37,34 +38,52 @@ function CustomerModel({ filters }) {
   };
 
   return (
-    <div style={{ marginTop: "20px" }}>
-      <h2>Customer Purchase Behavior Prediction</h2>
-      <button onClick={handleRetrain} disabled={loading}>Retrain</button>
-      <button onClick={handlePredict} disabled={loading} style={{ marginLeft: "10px" }}>Predict</button>
+    <div className="customer-container">
+      <h2 className="customer-title">Customer Purchase Behavior Prediction</h2>
+
+      <div className="customer-buttons">
+        <button 
+          onClick={handleRetrain} 
+          disabled={loading} 
+          className="customer-button retrain"
+        >
+          {loading ? "Retraining..." : "Retrain"}
+        </button>
+
+        <button 
+          onClick={handlePredict} 
+          disabled={loading} 
+          className="customer-button predict"
+        >
+          {loading ? "Predicting..." : "Predict"}
+        </button>
+      </div>
 
       {results.length > 0 && (
-        <table border="1" cellPadding="5" style={{ marginTop: "10px" }}>
-          <thead>
-            <tr>
-              <th>Customer Key</th>
-              <th>Year</th>
-              <th>Month</th>
-              <th>Purchase Probability</th>
-              <th>Prediction</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((r, idx) => (
-              <tr key={idx}>
-                <td>{r.CustomerKey}</td>
-                <td>{r.Year}</td>
-                <td>{r.Month}</td>
-                <td>{r.PurchaseProbability.toFixed(2)}</td>
-                <td>{r.Prediction}</td>
+        <div className="customer-table-wrapper">
+          <table className="customer-table">
+            <thead>
+              <tr>
+                <th>Customer Key</th>
+                <th>Year</th>
+                <th>Month</th>
+                <th>Purchase Probability</th>
+                <th>Prediction</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {results.map((r, idx) => (
+                <tr key={idx}>
+                  <td>{r.CustomerKey}</td>
+                  <td>{r.Year}</td>
+                  <td>{r.Month}</td>
+                  <td className="customer-value">{r.PurchaseProbability.toFixed(2)}</td>
+                  <td>{r.Prediction}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

@@ -1,0 +1,74 @@
+/* DemandModel.css */
+
+.demand-container {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  font-family: Arial, sans-serif;
+}
+
+.demand-title {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.demand-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.demand-button {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  color: #fff;
+}
+
+.demand-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.demand-button.retrain {
+  background-color: #007bff;
+}
+
+.demand-button.predict {
+  background-color: #28a745;
+}
+
+.demand-table-wrapper {
+  overflow-x: auto;
+}
+
+.demand-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.demand-table thead {
+  background-color: #343a40;
+  color: #fff;
+}
+
+.demand-table th,
+.demand-table td {
+  padding: 10px;
+  text-align: center;
+  border-bottom: 1px solid #ddd;
+}
+
+.demand-value {
+  font-weight: bold;
+  color: #28a745;
+}

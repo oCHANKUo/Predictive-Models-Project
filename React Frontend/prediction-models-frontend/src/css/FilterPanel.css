@@ -1,0 +1,40 @@
+/* FilterPanel.css */
+
+.filter-panel-container {
+  display: flex;
+  flex-wrap: wrap;                /* allow wrapping on smaller screens */
+  justify-content: space-evenly;  /* evenly space all filters horizontally */
+  align-items: center;
+  padding: 20px;
+  margin-bottom: 30px;
+  background-color: #f8f9fa;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  font-family: Arial, sans-serif;
+  gap: 20px;                      /* spacing between filters */
+}
+
+.filter-panel-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 120px;               /* ensures some minimum width for each filter */
+}
+
+.filter-panel-group label {
+  font-weight: bold;
+  color: #333;
+}
+
+.filter-panel-group select,
+.filter-panel-group input {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+  width: 100%;                   /* fill the width of the group */
+}
+
+.filter-panel-group input[type="number"] {
+  width: 100%;                   /* same for number inputs */
+}

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import "../css/DemandModel.css";
 
 function DemandModel({ filters }) {
   const [results, setResults] = useState([]);
@@ -32,32 +33,50 @@ function DemandModel({ filters }) {
   };
 
   return (
-    <div style={{ marginTop: "20px" }}>
-      <h2>Monthly Product Demand Prediction</h2>
-      <button onClick={handleRetrain} disabled={loading}>Retrain</button>
-      <button onClick={handlePredict} disabled={loading} style={{ marginLeft: "10px" }}>Predict</button>
+    <div className="demand-container">
+      <h2 className="demand-title">Monthly Product Demand Prediction</h2>
+
+      <div className="demand-buttons">
+        <button 
+          onClick={handleRetrain} 
+          disabled={loading} 
+          className="demand-button retrain"
+        >
+          {loading ? "Retraining..." : "Retrain"}
+        </button>
+
+        <button 
+          onClick={handlePredict} 
+          disabled={loading} 
+          className="demand-button predict"
+        >
+          {loading ? "Predicting..." : "Predict"}
+        </button>
+      </div>
 
       {results.length > 0 && (
-        <table border="1" cellPadding="5" style={{ marginTop: "10px" }}>
-          <thead>
-            <tr>
-              <th>Year</th>
-              <th>Month</th>
-              <th>Quarter</th>
-              <th>Predicted Demand</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((r, idx) => (
-              <tr key={idx}>
-                <td>{r.Year}</td>
-                <td>{r.Month}</td>
-                <td>{r.Quarter}</td>
-                <td>{r.PredictedDemand}</td>
+        <div className="demand-table-wrapper">
+          <table className="demand-table">
+            <thead>
+              <tr>
+                <th>Year</th>
+                <th>Month</th>
+                <th>Quarter</th>
+                <th>Predicted Demand</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {results.map((r, idx) => (
+                <tr key={idx}>
+                  <td>{r.Year}</td>
+                  <td>{r.Month}</td>
+                  <td>{r.Quarter}</td>
+                  <td className="demand-value">{r.PredictedDemand}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
