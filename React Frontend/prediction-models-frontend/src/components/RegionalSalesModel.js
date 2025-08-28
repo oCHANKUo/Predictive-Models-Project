@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import "../css/RegionalSalesModel.css"; 
 
 function RegionalSalesModel({ filters }) {
   const [results, setResults] = useState([]);
@@ -36,34 +37,52 @@ function RegionalSalesModel({ filters }) {
   };
 
   return (
-    <div style={{ marginTop: "20px" }}>
-      <h2>Regional Sales Prediction</h2>
-      <button onClick={handleRetrain} disabled={loading}>Retrain</button>
-      <button onClick={handlePredict} disabled={loading} style={{ marginLeft: "10px" }}>Predict</button>
+    <div className="regional-container">
+      <h2 className="regional-title">Regional Sales Prediction</h2>
+
+      <div className="regional-buttons">
+        <button 
+          onClick={handleRetrain} 
+          disabled={loading} 
+          className="regional-button retrain"
+        >
+          {loading ? "Retraining..." : "Retrain"}
+        </button>
+
+        <button 
+          onClick={handlePredict} 
+          disabled={loading} 
+          className="regional-button predict"
+        >
+          {loading ? "Predicting..." : "Predict"}
+        </button>
+      </div>
 
       {results.length > 0 && (
-        <table border="1" cellPadding="5" style={{ marginTop: "10px" }}>
-          <thead>
-            <tr>
-              <th>Territory</th>
-              <th>Year</th>
-              <th>Month</th>
-              <th>Predicted Top Category</th>
-              <th>Predicted Sales</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((r, idx) => (
-              <tr key={idx}>
-                <td>{r.TerritoryName}</td>
-                <td>{r.Year}</td>
-                <td>{r.Month}</td>
-                <td>{r.PredictedTopCategory}</td>
-                <td>{r.PredictedSales}</td>
+        <div className="regional-table-wrapper">
+          <table className="regional-table">
+            <thead>
+              <tr>
+                <th>Territory</th>
+                <th>Year</th>
+                <th>Month</th>
+                <th>Predicted Top Category</th>
+                <th>Predicted Sales</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {results.map((r, idx) => (
+                <tr key={idx}>
+                  <td>{r.TerritoryName}</td>
+                  <td>{r.Year}</td>
+                  <td>{r.Month}</td>
+                  <td>{r.PredictedTopCategory}</td>
+                  <td className="regional-sales-value">{r.PredictedSales}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

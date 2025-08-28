@@ -1,26 +1,24 @@
 import React, { useState } from "react";
 import axios from "axios";
+import "../css/SalesModel.css";
 
 function SalesModel({ filters }) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const handlePredict = async () => {
-  setLoading(true);
-  try {
-    const res = await axios.get("http://localhost:5000/predict_sales", {
-      params: { 
-        months: filters.month,   // how many months into the future
-        years: filters.year      // how many years into the future
-      }
-    });
-    setResults(res.data);
-  } catch (err) {
-    console.error(err);
-    alert("Error predicting sales");
-  }
-  setLoading(false);
-};
+    setLoading(true);
+    try {
+      const res = await axios.get("http://localhost:5000/predict_sales", {
+        params: { months: filters.month, years: filters.year }
+      });
+      setResults(res.data);
+    } catch (err) {
+      console.error(err);
+      alert("Error predicting sales");
+    }
+    setLoading(false);
+  };
 
   const handleRetrain = async () => {
     setLoading(true);
@@ -35,32 +33,50 @@ function SalesModel({ filters }) {
   };
 
   return (
-    <div style={{ marginTop: "20px" }}>
-      <h2>Monthly Sales Prediction</h2>
-      <button onClick={handleRetrain} disabled={loading}>Retrain</button>
-      <button onClick={handlePredict} disabled={loading} style={{ marginLeft: "10px" }}>Predict</button>
+    <div className="sales-container">
+      <h2 className="sales-title">Monthly Sales Prediction</h2>
+
+      <div className="sales-buttons">
+        <button 
+          onClick={handleRetrain} 
+          disabled={loading} 
+          className="sales-button retrain"
+        >
+          {loading ? "Retraining..." : "Retrain"}
+        </button>
+
+        <button 
+          onClick={handlePredict} 
+          disabled={loading} 
+          className="sales-button predict"
+        >
+          {loading ? "Predicting..." : "Predict"}
+        </button>
+      </div>
 
       {results.length > 0 && (
-        <table border="1" cellPadding="5" style={{ marginTop: "10px" }}>
-          <thead>
-            <tr>
-              <th>Year</th>
-              <th>Month</th>
-              <th>Quarter</th>
-              <th>Predicted Sales</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((r, idx) => (
-              <tr key={idx}>
-                <td>{r.Year}</td>
-                <td>{r.Month}</td>
-                <td>{r.Quarter}</td>
-                <td>{r.PredictedSales}</td>
+        <div className="sales-table-wrapper">
+          <table className="sales-table">
+            <thead>
+              <tr>
+                <th>Year</th>
+                <th>Month</th>
+                <th>Quarter</th>
+                <th>Predicted Sales</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {results.map((r, idx) => (
+                <tr key={idx}>
+                  <td>{r.Year}</td>
+                  <td>{r.Month}</td>
+                  <td>{r.Quarter}</td>
+                  <td className="sales-sales-value">{r.PredictedSales}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
