@@ -85,7 +85,8 @@ def train_model():
 # Prediction endpoint
 @app.route('/predict_sales', methods=['GET'])
 def predict_sales():
-    months_ahead = int(request.args.get("months", 6))  # default = 6
+    months_ahead = request.args.get("months", type=int)
+    years_ahead = request.args.get("years", type=int)
 
     model = joblib.load(MODEL_FILE)
     scaler = joblib.load(SCALER_FILE)

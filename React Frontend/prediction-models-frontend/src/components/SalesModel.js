@@ -6,18 +6,21 @@ function SalesModel({ filters }) {
   const [loading, setLoading] = useState(false);
 
   const handlePredict = async () => {
-    setLoading(true);
-    try {
-      const res = await axios.get("http://localhost:5000/predict_sales", {
-        params: { months: 6 }
-      });
-      setResults(res.data);
-    } catch (err) {
-      console.error(err);
-      alert("Error predicting sales");
-    }
-    setLoading(false);
-  };
+  setLoading(true);
+  try {
+    const res = await axios.get("http://localhost:5000/predict_sales", {
+      params: { 
+        months: filters.month,   // how many months into the future
+        years: filters.year      // how many years into the future
+      }
+    });
+    setResults(res.data);
+  } catch (err) {
+    console.error(err);
+    alert("Error predicting sales");
+  }
+  setLoading(false);
+};
 
   const handleRetrain = async () => {
     setLoading(true);
