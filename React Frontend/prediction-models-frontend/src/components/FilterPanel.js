@@ -22,14 +22,25 @@ function FilterPanel({ filters, onChange }) {
       </div>
 
       <div>
-        <label>Territory:</label>
-        <input
-          type="text"
-          value={filters.territory}
-          onChange={e => onChange("territory", e.target.value)}
-          placeholder="All"
-        />
-      </div>
+      <label>Territory:</label>
+      <select
+        value={filters.territory}
+        onChange={e => onChange("territory", e.target.value)}
+      >
+        <option value="">All</option>
+        <option value="Australia">Australia</option>
+        <option value="Canada">Canada</option>
+        <option value="Central">Central</option>
+        <option value="France">France</option>
+        <option value="Germany">Germany</option>
+        <option value="Northeast">Northeast</option>
+        <option value="Northwest">Northwest</option>
+        <option value="Southeast">Southeast</option>
+        <option value="Southwest">Southwest</option>
+        <option value="United Kingdom">United Kingdom</option>
+      </select>
+    </div>
+
 
       <div>
         <label>Top N Customers:</label>
