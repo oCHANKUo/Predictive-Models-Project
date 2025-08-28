@@ -9,7 +9,10 @@ function RegionalSalesModel({ filters }) {
     setLoading(true);
     try {
       const res = await axios.get("http://localhost:5001/predict_regional_sales", {
-        params: { months: 6, TerritoryName: filters.territory || undefined }
+        params: { 
+          months: filters.month || 6,  // use selected months, fallback = 6
+          TerritoryName: filters.territory || undefined 
+        }
       });
       setResults(res.data);
     } catch (err) {
@@ -18,6 +21,7 @@ function RegionalSalesModel({ filters }) {
     }
     setLoading(false);
   };
+
 
   const handleRetrain = async () => {
     setLoading(true);
