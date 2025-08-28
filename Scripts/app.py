@@ -1,5 +1,4 @@
-from threading import Thread
-
+from multiprocessing import Process
 from sales_prediction_model import app as sales_app
 from regional_sales_model import app as region_app
 from demand_model import app as product_app
@@ -25,10 +24,20 @@ def run_product():
 def run_customer():
     customer_app.run(port=PORTS['customer'], debug=True, use_reloader=False)
 
-# Start all apps in separate threads
 if __name__ == "__main__":
-    Thread(target=run_sales).start()
-    Thread(target=run_region).start()
-    Thread(target=run_product).start()
-    Thread(target=run_customer).start()
+    processes = [
+        Process(target=run_sales),
+        Process(target=run_region),
+        Process(target=run_product),
+        Process(target=run_customer),
+    ]
+
+    # Start all processes
+    for p in processes:
+        p.start()
+
     print("All model Flask apps are running.")
+
+    # Wait for processes to finish
+    for p in processes:
+        p.join()

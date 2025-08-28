@@ -8,7 +8,9 @@ function DemandModel({ filters }) {
   const handlePredict = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("http://localhost:5002/predict_demand", { params: { months: 6 } });
+      const res = await axios.get("http://localhost:5002/predict_demand", { 
+        params: { months: filters.month || 6 }  // ✅ use selected months
+      });
       setResults(res.data);
     } catch (err) {
       console.error(err);
