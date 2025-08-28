@@ -9,7 +9,7 @@ function DemandModel({ filters }) {
     setLoading(true);
     try {
       const res = await axios.get("http://localhost:5002/predict_demand", { 
-        params: { months: filters.month || 6 }  // ✅ use selected months
+        params: { months: filters.month || 6 } 
       });
       setResults(res.data);
     } catch (err) {
