@@ -89,7 +89,18 @@ def train_model():
 
 @app.route("/predict_regional_sales", methods=['GET','POST'])
 def predict():
-    months_to_predict = int(request.args.get("months", 6))
+    data = request.get_json(silent=True) or {}
+    selected_year = request.args.get("year", type=int) or data.get("year")
+    selected_month = request.args.get("month", type=int) or data.get("month")
+    territory_input = request.args.get("TerritoryName") or data.get("TerritoryName")
+
+    if selected_year is None:
+        return jsonify({"error": "Year is required"}), 400
+
+    if not os.path.exists(SALES_MODEL_FILE):
+        return jsonify({"error": "Model not trained yet"}), 400
+
+    months_to_predict = [selected_month] if selected_month else range(1, 13)
 
     if not os.path.exists(SALES_MODEL_FILE):
         return jsonify({"error": "Model not trained yet"}), 400
@@ -100,9 +111,9 @@ def predict():
         columns = pickle.load(f)
 
     df = fetch_data()
-    X, y, df_proc = preprocess(df)
-    last_year = df['Year'].max()
-    last_month = df[df['Year']==last_year]['Month'].max()
+    df['Year'] = df['Year'].astype(int)
+    df['Month'] = df['Month'].astype(int)
+    min_year = df['Year'].min()
 
     # historical monthly averages
     historical_avg = df.groupby('Month').agg({
@@ -114,39 +125,33 @@ def predict():
     }).reset_index()
 
     # Territory filter
-    territory_input = request.args.get("TerritoryName")
-    data = request.get_json(silent=True)
-    territory_input = territory_input or (data.get("TerritoryName") if data else None)
     territories = [territory_input] if territory_input else df['TerritoryName'].unique()
 
     results = []
     for terr in territories:
-        for i in range(1, months_to_predict+1):
-            # Calculate future year and month
-            month = last_month + i
-            year = last_year + (month-1)//12
-            month = ((month-1)%12) + 1
+        for m in months_to_predict:
+            month_index = (selected_year - min_year) * 12 + m
 
             row = pd.DataFrame(0, index=[0], columns=columns)
 
-            # One-hot territory column
+            # One-hot encode territory
             terr_col = [c for c in columns if terr in c]
             if terr_col:
                 row.loc[0, terr_col] = 1
 
-            month_index = int((year - df['Year'].min())*12 + month)
             row.loc[0, 'MonthIndex'] = month_index
 
+            # Fill features with historical averages
             for col in ['TotalOrders', 'AvgUnitPrice', 'AvgDiscount', 'UniqueCustomers', 'AvgShippingTime']:
-                row.loc[0, col] = historical_avg.loc[historical_avg['Month']==month, col].values[0]
+                row.loc[0, col] = historical_avg.loc[historical_avg['Month']==m, col].values[0]
 
             predicted_sales = reg.predict(row)[0]
 
             results.append({
-                "TerritoryName": str(terr),
-                "Year": int(year),
-                "Month": int(month),
-                "PredictedSales": float(predicted_sales)
+                "TerritoryName": terr,
+                "Year": selected_year,
+                "Month": m,
+                "PredictedSales": round(float(predicted_sales), 2)
             })
 
     return jsonify(results)
