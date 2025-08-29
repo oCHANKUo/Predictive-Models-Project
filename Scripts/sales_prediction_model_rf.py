@@ -12,7 +12,6 @@ CORS(app)
 
 MODEL_FILE = "sales_rf_model.pkl"
 
-# --- Database connection ---
 def get_connection():
     conn = pyodbc.connect(
         "DRIVER={ODBC Driver 17 for SQL Server};"
@@ -23,7 +22,6 @@ def get_connection():
     )
     return conn
 
-# --- Fetch data with multiple features ---
 def fetch_data():
     query = """
     SELECT 
@@ -51,26 +49,21 @@ def fetch_data():
     conn.close()
     return df
 
-# --- Endpoint to train model ---
 @app.route('/train_sales_rf', methods=['POST', 'GET'])
 def train_sales_rf():
     try:
         df = fetch_data()
         
-        # Features and target
         features = ['Year', 'Month', 'Quarter', 'IsHolidaySL', 'TotalOrders', 
                     'AvgUnitPrice', 'AvgDiscount', 'UniqueCustomers', 'AvgShippingTime']
         X = df[features]
         y = df['TotalSales']
         
-        # Train-test split
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         
-        # Train Random Forest
         rf = RandomForestRegressor(n_estimators=200, random_state=42)
         rf.fit(X_train, y_train)
         
-        # Save model
         joblib.dump(rf, MODEL_FILE)
         
         return jsonify({"message": "Model trained and saved successfully!"})
@@ -78,16 +71,13 @@ def train_sales_rf():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --- Endpoint to predict sales ---
 @app.route('/predict_sales_rf', methods=['GET', 'POST'])
 def predict_sales():
-    try:
         if not os.path.exists(MODEL_FILE):
             return jsonify({"error": "Model not trained yet. Call /train_sales_rf first."}), 400
         
         rf = joblib.load(MODEL_FILE)
-        
-        # Input parameters
+    
         selected_year = request.args.get("year", type=int, default=2015)
         selected_month = request.args.get("month", default=None, type=int)
         is_holiday = request.args.get("isholiday", default=0, type=int)
@@ -116,10 +106,6 @@ def predict_sales():
             })
         
         return jsonify(results)
-    
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
-# --- Run Flask app ---
-if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+# if __name__ == "__main__":
+#     app.run(debug=True, port=5000)
