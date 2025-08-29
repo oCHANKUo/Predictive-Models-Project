@@ -122,12 +122,20 @@ def predict_customer():
     full_df['PurchaseProbability'] = preds
     full_df['Prediction'] = (preds > 0.5).astype(int)
 
-    latest = full_df.groupby("CustomerKey").tail(1)
+    data = request.get_json(silent=True) or {}
+    selected_year = request.args.get("year", type=int) 
+    selected_month = request.args.get("month", type=int)
+    top_n = request.args.get("top_n", default=10, type=int)
+
+    latest = full_df.copy()
+    if selected_year:
+        latest = latest[latest['Year'] == selected_year]
+    if selected_month:
+        latest = latest[latest['Month'] == selected_month]
+
+    latest = latest.groupby("CustomerKey").tail(1)
 
     top_n = request.args.get("top_n", default=10, type=int)
-    customer_key = request.args.get("customer_key", default=None, type=int)
-    if customer_key:
-        latest = latest[latest["CustomerKey"] == customer_key]
     latest = latest.sort_values(by="PurchaseProbability", ascending=False).head(top_n)
 
     results = latest[['CustomerKey', 'Year', 'Month', 'PurchaseProbability', 'Prediction']].to_dict(orient="records")
