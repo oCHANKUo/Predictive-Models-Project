@@ -33,12 +33,21 @@ def fetch_data():
             t.TerritoryName,
             d.Year,
             d.Month,
-            SUM(f.OrderQty) AS TotalSales
+            SUM(f.OrderQty) AS TotalSales,
+            COUNT(DISTINCT f.SalesOrderID) AS TotalOrders,
+            AVG(f.UnitPrice) AS AvgUnitPrice,
+            AVG(f.UnitPriceDiscount) AS AvgDiscount,
+            COUNT(DISTINCT f.CustomerKey) AS UniqueCustomers,
+            AVG(DATEDIFF(
+                DAY,
+                CAST(CONVERT(VARCHAR(8), f.OrderDateKey) AS DATE),
+                CAST(CONVERT(VARCHAR(8), f.ShipDateKey) AS DATE)
+            )) AS AvgShippingTime
+
         FROM FactSalesOrderDetail f
         JOIN DimTerritory t ON f.TerritoryKey = t.TerritoryKey
         JOIN DimDate d ON f.OrderDateKey = d.DateKey
         GROUP BY t.TerritoryName, d.Year, d.Month
-        ORDER BY d.Year, d.Month
     """
     conn = get_connection()
     df = pd.read_sql(query, conn)
@@ -52,6 +61,12 @@ def preprocess(df):
 
     X = pd.get_dummies(df[['TerritoryName']], drop_first=True)
     X['MonthIndex'] = df['MonthIndex']
+    X['TotalOrders'] = df['TotalOrders']
+    X['AvgUnitPrice'] = df['AvgUnitPrice']
+    X['AvgDiscount'] = df['AvgDiscount']
+    X['UniqueCustomers'] = df['UniqueCustomers']
+    X['AvgShippingTime'] = df['AvgShippingTime']
+
 
     y = df['TotalSales']
 
@@ -89,6 +104,15 @@ def predict():
     last_year = df['Year'].max()
     last_month = df[df['Year']==last_year]['Month'].max()
 
+    # historical monthly averages
+    historical_avg = df.groupby('Month').agg({
+        'TotalOrders':'mean',
+        'AvgUnitPrice':'mean',
+        'AvgDiscount':'mean',
+        'UniqueCustomers':'mean',
+        'AvgShippingTime':'mean'
+    }).reset_index()
+
     territory_input = request.form.get("TerritoryName") or request.args.get("TerritoryName")
     data = request.get_json(silent=True)
     territory_input = territory_input or (data.get("TerritoryName") if data else None)
@@ -97,18 +121,25 @@ def predict():
     results = []
     for terr in territories:
         for i in range(1, months_to_predict+1):
+            # Calculate future year and month
             month = last_month + i
             year = last_year + (month-1)//12
             month = ((month-1)%12) + 1
 
             row = pd.DataFrame(0, index=[0], columns=columns)
-            # Territory encoding
+
             terr_col = [c for c in columns if terr in c]
             if terr_col:
                 row.loc[0, terr_col] = 1
-            # Month index
+
             month_index = int((year - df['Year'].min())*12 + month)
             row.loc[0, 'MonthIndex'] = month_index
+
+            row.loc[0, 'TotalOrders'] = historical_avg.loc[historical_avg['Month']==month, 'TotalOrders'].values[0]
+            row.loc[0, 'AvgUnitPrice'] = historical_avg.loc[historical_avg['Month']==month, 'AvgUnitPrice'].values[0]
+            row.loc[0, 'AvgDiscount'] = historical_avg.loc[historical_avg['Month']==month, 'AvgDiscount'].values[0]
+            row.loc[0, 'UniqueCustomers'] = historical_avg.loc[historical_avg['Month']==month, 'UniqueCustomers'].values[0]
+            row.loc[0, 'AvgShippingTime'] = historical_avg.loc[historical_avg['Month']==month, 'AvgShippingTime'].values[0]
 
             predicted_sales = reg.predict(row)[0]
 
@@ -120,6 +151,7 @@ def predict():
             })
 
     return jsonify(results)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
