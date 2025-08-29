@@ -2,29 +2,28 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pyodbc
 import pandas as pd
-import os
-import joblib
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
+import joblib
+import os
 
 app = Flask(__name__)
 CORS(app)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_FILE = os.path.join(BASE_DIR, "rf_sales_model.pkl")
-COLUMNS_FILE = os.path.join(BASE_DIR, "rf_sales_columns.pkl")
+MODEL_FILE = "sales_rf_model.pkl"
 
-
+# --- Database connection ---
 def get_connection():
-    return pyodbc.connect(
+    conn = pyodbc.connect(
         "DRIVER={ODBC Driver 17 for SQL Server};"
         "SERVER=localhost\\MSSQLSERVER03;"
         "DATABASE=DataWarehouseClassic;"
         "UID=admin;"
         "PWD=admin"
     )
+    return conn
 
-
+# --- Fetch data with multiple features ---
 def fetch_data():
     query = """
     SELECT 
@@ -52,106 +51,75 @@ def fetch_data():
     conn.close()
     return df
 
-
-@app.route("/train_sales_rf", methods=['GET', 'POST'])
+# --- Endpoint to train model ---
+@app.route('/train_sales_rf', methods=['POST', 'GET'])
 def train_sales_rf():
-    df = fetch_data()
-
-    df['Year'] = df['Year'].astype(int)
-    df['Month'] = df['Month'].astype(int)
-    df['Quarter'] = df['Quarter'].astype(int)
-    df['IsHolidaySL'] = df['IsHolidaySL'].astype(int)
-    df['TotalSales'] = df['TotalSales'].astype(float)
-    df['MonthIndex'] = (df['Year'] - df['Year'].min()) * 12 + df['Month']
+    try:
+        df = fetch_data()
+        
+        # Features and target
+        features = ['Year', 'Month', 'Quarter', 'IsHolidaySL', 'TotalOrders', 
+                    'AvgUnitPrice', 'AvgDiscount', 'UniqueCustomers', 'AvgShippingTime']
+        X = df[features]
+        y = df['TotalSales']
+        
+        # Train-test split
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        
+        # Train Random Forest
+        rf = RandomForestRegressor(n_estimators=200, random_state=42)
+        rf.fit(X_train, y_train)
+        
+        # Save model
+        joblib.dump(rf, MODEL_FILE)
+        
+        return jsonify({"message": "Model trained and saved successfully!"})
     
-    X = df[['Year', 'MonthIndex', 'Month', 'Quarter', 'IsHolidaySL',
-            'TotalOrders', 'AvgUnitPrice', 'AvgDiscount', 'UniqueCustomers', 'AvgShippingTime']]
-    y = df['TotalSales']
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# --- Endpoint to predict sales ---
+@app.route('/predict_sales_rf', methods=['GET', 'POST'])
+def predict_sales():
+    try:
+        if not os.path.exists(MODEL_FILE):
+            return jsonify({"error": "Model not trained yet. Call /train_sales_rf first."}), 400
+        
+        rf = joblib.load(MODEL_FILE)
+        
+        # Input parameters
+        selected_year = request.args.get("year", type=int, default=2015)
+        selected_month = request.args.get("month", default=None, type=int)
+        is_holiday = request.args.get("isholiday", default=0, type=int)
+        total_orders = request.args.get("totalorders", default=100, type=float)
+        avg_price = request.args.get("avgprice", default=50, type=float)
+        avg_discount = request.args.get("avgdiscount", default=0, type=float)
+        unique_customers = request.args.get("uniquecustomers", default=50, type=float)
+        avg_ship_time = request.args.get("avgshiptime", default=3, type=float)
+        
+        if selected_year is None:
+            return jsonify({"error": "Year is required"}), 400
+        
+        months_to_predict = [selected_month] if selected_month else list(range(1, 13))
+        
+        results = []
+        for m in months_to_predict:
+            quarter = ((m-1)//3) + 1
+            X_pred = [[selected_year, m, quarter, is_holiday, total_orders,
+                       avg_price, avg_discount, unique_customers, avg_ship_time]]
+            pred = rf.predict(X_pred)
+            results.append({
+                "Year": int(selected_year),
+                "Month": int(m),
+                "Quarter": int(quarter),
+                "PredictedSales": float(round(pred[0], 2))
+            })
+        
+        return jsonify(results)
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-    model = RandomForestRegressor(n_estimators=200, random_state=42)
-    model.fit(X_train, y_train)
-
-    joblib.dump(model, MODEL_FILE)
-    joblib.dump(X.columns.tolist(), COLUMNS_FILE)
-
-    return jsonify({"message": "Random Forest sales model trained and saved."})
-
-
-@app.route("/predict_sales_rf", methods=['POST', 'GET'])
-def predict_sales_rf():
-    selected_year = request.args.get("year", default=2015, type=int)
-    selected_month = request.args.get("month", default=None, type=int)
-
-    if selected_year is None:
-        return jsonify({"error": "Year is required"}), 400
-
-    # Decide which months to predict
-    months_to_predict = [selected_month] if selected_month else list(range(1, 13))
-
-    # Ensure no duplicates
-    months_to_predict = list(dict.fromkeys(months_to_predict))
-
-    # Load model and feature columns
-    model = joblib.load(MODEL_FILE)
-    feature_columns = joblib.load(COLUMNS_FILE)
-
-    # Fetch historical data
-    df = fetch_data()
-    df['Year'] = df['Year'].astype(int)
-    df['Month'] = df['Month'].astype(int)
-    min_year = df['Year'].min()
-
-    # Compute historical averages for features
-    historical_avg = (
-        df.groupby('Month', as_index=False).agg({
-            'TotalOrders':'mean',
-            'AvgUnitPrice':'mean',
-            'AvgDiscount':'mean',
-            'UniqueCustomers':'mean',
-            'AvgShippingTime':'mean'
-        }).sort_values('Month')
-    )
-
-    months_to_predict = sorted(months_to_predict)
-
-    results = []
-
-    for m in months_to_predict:
-        month_index = (selected_year - min_year) * 12 + m
-
-        # Get historical values for month m
-        row = historical_avg[historical_avg['Month']==m].iloc[0]
-
-        # Construct a single-row DataFrame with all features
-        future = pd.DataFrame([{
-            "MonthIndex": month_index,
-            "Year": selected_year,
-            "Month": m,
-            "Quarter": (m - 1)//3 + 1,
-            "IsHolidaySL": 0,
-            "TotalOrders": row['TotalOrders'],
-            "AvgUnitPrice": row['AvgUnitPrice'],
-            "AvgDiscount": row['AvgDiscount'],
-            "UniqueCustomers": row['UniqueCustomers'],
-            "AvgShippingTime": row['AvgShippingTime']
-        }])
-
-        X_future = future[feature_columns]
-        preds = model.predict(X_future)
-
-        results.append({
-            "Year": selected_year,
-            "Month": m,
-            "Quarter": future.iloc[0]['Quarter'],
-            "PredictedSales": round(float(preds[0]), 2)
-        })
-
-    results = sorted(results, key=lambda x: x["Month"])
-
-    return jsonify(results)
-
-
+# --- Run Flask app ---
 if __name__ == "__main__":
-    app.run(port=5004, debug=True)
+    app.run(debug=True, port=5000)
