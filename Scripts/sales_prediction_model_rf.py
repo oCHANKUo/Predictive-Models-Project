@@ -2,30 +2,28 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pyodbc
 import pandas as pd
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
-import joblib
-import numpy as np
 import os
+import joblib
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
 
 app = Flask(__name__)
 CORS(app)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
-RF_MODEL_FILE = os.path.join(BASE_DIR, "../models/sales_rf_model.pkl")
-RF_SCALER_FILE = os.path.join(BASE_DIR, "../scaler/sales_rf_scaler.pkl")
-RF_X_COLUMNS_FILE = os.path.join(BASE_DIR, "../columns/sales_rf_X_columns.pkl")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_FILE = os.path.join(BASE_DIR, "rf_sales_model.pkl")
+COLUMNS_FILE = os.path.join(BASE_DIR, "rf_sales_columns.pkl")
+
 
 def get_connection():
-    conn = pyodbc.connect(
+    return pyodbc.connect(
         "DRIVER={ODBC Driver 17 for SQL Server};"
         "SERVER=localhost\\MSSQLSERVER03;"
         "DATABASE=DataWarehouseClassic;"
         "UID=admin;"
         "PWD=admin"
     )
-    return conn
+
 
 def fetch_data():
     query = """
@@ -54,8 +52,9 @@ def fetch_data():
     conn.close()
     return df
 
-@app.route('/train_sales_rf', methods=['POST', 'GET'])
-def train_rf_model():
+
+@app.route("/train_sales_rf", methods=['GET', 'POST'])
+def train_sales_rf():
     df = fetch_data()
 
     df['Year'] = df['Year'].astype(int)
@@ -63,32 +62,24 @@ def train_rf_model():
     df['Quarter'] = df['Quarter'].astype(int)
     df['IsHolidaySL'] = df['IsHolidaySL'].astype(int)
     df['TotalSales'] = df['TotalSales'].astype(float)
-
-    # Add MonthIndex to capture time trend
     df['MonthIndex'] = (df['Year'] - df['Year'].min()) * 12 + df['Month']
-
-    # Define features and target
-    X = df[['Year','MonthIndex', 'Month', 'Quarter', 'IsHolidaySL',
+    
+    X = df[['Year', 'MonthIndex', 'Month', 'Quarter', 'IsHolidaySL',
             'TotalOrders', 'AvgUnitPrice', 'AvgDiscount', 'UniqueCustomers', 'AvgShippingTime']]
     y = df['TotalSales']
 
-    # Scale features
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Train Random Forest
-    rf_model = RandomForestRegressor(n_estimators=200, random_state=42)
-    rf_model.fit(X_scaled, y)
+    model = RandomForestRegressor(n_estimators=200, random_state=42)
+    model.fit(X_train, y_train)
 
-    # Save model, scaler, and columns
-    joblib.dump(rf_model, RF_MODEL_FILE)
-    joblib.dump(scaler, RF_SCALER_FILE)
-    joblib.dump(X.columns, RF_X_COLUMNS_FILE)
+    joblib.dump(model, MODEL_FILE)
+    joblib.dump(X.columns.tolist(), COLUMNS_FILE)
 
-    return jsonify({"message": "Random Forest Sales Prediction model trained successfully"})
+    return jsonify({"message": "Random Forest sales model trained and saved."})
 
 
-@app.route('/predict_sales_rf', methods=['GET', 'POST'])
+@app.route("/predict_sales_rf", methods=['POST', 'GET'])
 def predict_sales_rf():
     selected_year = request.args.get("year", default=2015, type=int)
     selected_month = request.args.get("month", default=None, type=int)
@@ -96,62 +87,71 @@ def predict_sales_rf():
     if selected_year is None:
         return jsonify({"error": "Year is required"}), 400
 
-    if selected_month is None:
-        months_to_predict = range(1, 13)
-    else:
-        months_to_predict = [selected_month]
+    # Decide which months to predict
+    months_to_predict = [selected_month] if selected_month else list(range(1, 13))
 
-    # Load trained model
-    model = joblib.load(RF_MODEL_FILE)
-    scaler = joblib.load(RF_SCALER_FILE)
-    X_columns = joblib.load(RF_X_COLUMNS_FILE)
+    # Ensure no duplicates
+    months_to_predict = list(dict.fromkeys(months_to_predict))
 
-    # Fetch full training data
+    # Load model and feature columns
+    model = joblib.load(MODEL_FILE)
+    feature_columns = joblib.load(COLUMNS_FILE)
+
+    # Fetch historical data
     df = fetch_data()
     df['Year'] = df['Year'].astype(int)
     df['Month'] = df['Month'].astype(int)
-    df['Quarter'] = df['Quarter'].astype(int)
-    df['IsHolidaySL'] = df['IsHolidaySL'].astype(int)
-    df['TotalSales'] = df['TotalSales'].astype(float)
-
-    # Add MonthIndex for trend
     min_year = df['Year'].min()
-    df['MonthIndex'] = (df['Year'] - min_year) * 12 + df['Month']
+
+    # Compute historical averages for features
+    historical_avg = (
+        df.groupby('Month', as_index=False).agg({
+            'TotalOrders':'mean',
+            'AvgUnitPrice':'mean',
+            'AvgDiscount':'mean',
+            'UniqueCustomers':'mean',
+            'AvgShippingTime':'mean'
+        }).sort_values('Month')
+    )
+
+    months_to_predict = sorted(months_to_predict)
 
     results = []
 
     for m in months_to_predict:
-        # Try to get actual feature values for that year/month
-        row = df[(df['Year'] == selected_year) & (df['Month'] == m)]
+        month_index = (selected_year - min_year) * 12 + m
 
-        if not row.empty:
-            # Use actual historical data if available
-            future = row.iloc[0][X_columns].to_frame().T
-        else:
-            # Fallback: use mean of that month across years
-            monthly_mean = df[df['Month'] == m][X_columns].mean()
-            future = monthly_mean.to_frame().T
-            # Update year + month + monthIndex
-            future["Year"] = selected_year
-            future["Month"] = m
-            future["MonthIndex"] = (selected_year - min_year) * 12 + m
-            future["Quarter"] = (m - 1) // 3 + 1
-            future["IsHolidaySL"] = 0
+        # Get historical values for month m
+        row = historical_avg[historical_avg['Month']==m].iloc[0]
 
-        # Scale and predict
-        X_future_scaled = scaler.transform(future[X_columns])
-        preds = model.predict(X_future_scaled)
+        # Construct a single-row DataFrame with all features
+        future = pd.DataFrame([{
+            "MonthIndex": month_index,
+            "Year": selected_year,
+            "Month": m,
+            "Quarter": (m - 1)//3 + 1,
+            "IsHolidaySL": 0,
+            "TotalOrders": row['TotalOrders'],
+            "AvgUnitPrice": row['AvgUnitPrice'],
+            "AvgDiscount": row['AvgDiscount'],
+            "UniqueCustomers": row['UniqueCustomers'],
+            "AvgShippingTime": row['AvgShippingTime']
+        }])
+
+        X_future = future[feature_columns]
+        preds = model.predict(X_future)
 
         results.append({
-            "Year": int(selected_year),
-            "Month": int(m),
-            "Quarter": int(future["Quarter"].values[0]),
+            "Year": selected_year,
+            "Month": m,
+            "Quarter": future.iloc[0]['Quarter'],
             "PredictedSales": round(float(preds[0]), 2)
         })
+
+    results = sorted(results, key=lambda x: x["Month"])
 
     return jsonify(results)
 
 
-
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    app.run(port=5004, debug=True)
