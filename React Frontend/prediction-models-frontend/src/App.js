@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import SalesModel from "./components/SalesModel";
+import SalesModel_rf from "./components/SalesModel_rf";
 import RegionalSalesModel from "./components/RegionalSalesModel";
 import DemandModel from "./components/DemandModel";
 import CustomerModel from "./components/CustomerModel";
@@ -24,6 +25,7 @@ function App() {
 
       <div style={{ marginTop: "30px" }}>
         <SalesModel filters={filters} />
+        <SalesModel_rf filters={filters} />
         <RegionalSalesModel filters={filters} />
         <DemandModel filters={filters} />
         <CustomerModel filters={filters} />
