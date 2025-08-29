@@ -69,9 +69,10 @@ def fetch_monthly_demand():
     return df
 
 def add_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
-    start_year = df["Year"].min()
+    # start_year = df["Year"].min()
     df = df.copy()
-    df["MonthIndex"] = (df["Year"] - start_year) * 12 + df["Month"]
+    # df["MonthIndex"] = (df["Year"] - start_year) * 12 + df["Month"]
+    df["MonthIndex"] = (df["Year"] - df["Year"].min()) * 12 + df["Month"]
     return df
 
 @app.route("/train_demand", methods=["POST", "GET"])
@@ -103,7 +104,19 @@ def train_demand():
 
 @app.route("/predict_demand", methods=['GET','POST'])
 def predict_demand():
-    months_ahead = int(request.args.get("months", 6)) 
+    data = request.get_json(silent=True) or {}
+    selected_year = request.args.get("year", type=int) or data.get("year")
+    selected_month = request.args.get("month", type=int) or data.get("month")
+
+    hist = fetch_monthly_demand()
+    hist = add_calendar_features(hist)
+
+    # Default to latest historical year if none selected
+    if selected_year is None:
+        selected_year = hist["Year"].max()
+
+    # If month selected, use only that month; else all months
+    months_to_predict = [selected_month] if selected_month else range(1, 13)
 
     with open(MODEL_PATH, "rb") as f:
         model = pickle.load(f)
@@ -111,31 +124,6 @@ def predict_demand():
         scaler = pickle.load(f)
     with open(COLUMNS_PATH, "rb") as f:
         feature_cols = pickle.load(f)
-
-    hist = fetch_monthly_demand()
-    hist = add_calendar_features(hist)
-
-    last_year = hist.loc[hist["Year"].idxmax(), "Year"]
-    last_month = hist[hist["Year"] == last_year]["Month"].max()
-
-    start_year = hist["Year"].min()
-    last_index = (last_year - start_year) * 12 + last_month
-
-    fut_rows = []
-    for i in range(1, months_ahead + 1):
-        m = last_month + i
-        y = last_year + (m - 1) // 12
-        m = ((m - 1) % 12) + 1
-        q = ((m - 1) // 3) + 1
-        mi = last_index + i
-        fut_rows.append({
-            "Year": int(y),
-            "Month": int(m),
-            "Quarter": int(q),
-            "IsHolidaySL": 0,      
-            "MonthIndex": int(mi),
-        })
-    future_df = pd.DataFrame(fut_rows)
 
     historical_avg = hist.groupby("Month").agg({
         "TotalOrders":"mean",
@@ -145,9 +133,25 @@ def predict_demand():
         "AvgShippingTime":"mean"
     }).reset_index()
 
-    for col in ["TotalOrders", "AvgUnitPrice", "AvgDiscount", "UniqueCustomers", "AvgShippingTime"]:
-        future_df[col] = future_df["Month"].apply(lambda m: historical_avg.loc[historical_avg["Month"]==m, col].values[0])
+    start_year = hist["Year"].min()
+    fut_rows = []
+    for m in months_to_predict:
+        month_index = (selected_year - start_year) * 12 + m
+        quarter = ((m - 1) // 3) + 1
+        fut_rows.append({
+            "Year": selected_year,
+            "Month": m,
+            "Quarter": quarter,
+            "IsHolidaySL": 0,
+            "MonthIndex": month_index,
+            "TotalOrders": historical_avg.loc[historical_avg["Month"]==m, "TotalOrders"].values[0],
+            "AvgUnitPrice": historical_avg.loc[historical_avg["Month"]==m, "AvgUnitPrice"].values[0],
+            "AvgDiscount": historical_avg.loc[historical_avg["Month"]==m, "AvgDiscount"].values[0],
+            "UniqueCustomers": historical_avg.loc[historical_avg["Month"]==m, "UniqueCustomers"].values[0],
+            "AvgShippingTime": historical_avg.loc[historical_avg["Month"]==m, "AvgShippingTime"].values[0]
+        })
 
+    future_df = pd.DataFrame(fut_rows)
     X_future = future_df[feature_cols]
     X_future_scaled = scaler.transform(X_future)
     preds = model.predict(X_future_scaled)
