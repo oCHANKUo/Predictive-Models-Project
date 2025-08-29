@@ -8,7 +8,7 @@ import FilterPanel from "./components/FilterPanel";
 function App() {
   const [filters, setFilters] = useState({
     year: new Date().getFullYear(),
-    month: new Date().getMonth() + 1,
+    month: 6,
     territory: "",
     topN: 10
   });
