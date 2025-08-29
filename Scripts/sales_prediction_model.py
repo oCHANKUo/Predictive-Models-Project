@@ -85,7 +85,7 @@ def train_model():
     return jsonify({"message": "Monthly Sales Prediction model trained successfully"})
 
 
-@app.route('/predict_sales', methods=['GET'])
+@app.route('/predict_sales', methods=['GET', 'POST'])
 def predict_sales():
     selected_year = request.args.get("year", type=int)
     selected_month = request.args.get("month", default=None, type=int)
@@ -106,8 +106,6 @@ def predict_sales():
     df['Year'] = df['Year'].astype(int)
     df['Month'] = df['Month'].astype(int)
     min_year = df['Year'].min()
-
-    month_index = (selected_year - min_year) * 12 + selected_month
 
     historical_avg = df.groupby('Month').agg({
         'TotalOrders':'mean',
@@ -141,7 +139,7 @@ def predict_sales():
 
         results.append({
             "Year": selected_year,
-            "Month": selected_month,
+            "Month": m,
             "Quarter": future.iloc[0]['Quarter'],
             "PredictedSales": round(float(preds[0]), 2)
         })

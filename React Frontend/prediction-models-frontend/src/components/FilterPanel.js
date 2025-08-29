@@ -3,7 +3,7 @@ import "../css/FilterPanel.css";
 
 function FilterPanel({ filters, onChange }) {
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+  const years = Array.from({ length: 2030 - 2015 + 1 }, (_, i) => 2015 + i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
   return (
