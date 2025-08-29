@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import "../css/FilterPanel.css";
 
 function FilterPanel({ filters, onChange }) {
@@ -18,6 +18,7 @@ function FilterPanel({ filters, onChange }) {
       <div className="filter-panel-group">
         <label>Month:</label>
         <select value={filters.month} onChange={e => onChange("month", parseInt(e.target.value))}>
+          <option value="">All Months</option>
           {months.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect  } from "react";
 import axios from "axios";
 import "../css/SalesModel.css";
 
@@ -6,13 +6,24 @@ function SalesModel({ filters }) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    // Trigger if a year is selected
+    if (filters.year) {
+      handlePredict();
+    }
+  }, [filters.year, filters.month]);
+
+
   const handlePredict = async () => {
     setLoading(true);
     try {
       const res = await axios.get("http://localhost:5000/predict_sales", {
-        params: { months: filters.month, 
-                  years: filters.year }
-      });
+      params: { 
+        year: filters.year, 
+        month: filters.month || null 
+      }
+    });
+
       setResults(res.data);
     } catch (err) {
       console.error(err);

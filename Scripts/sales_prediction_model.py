@@ -85,10 +85,18 @@ def train_model():
     return jsonify({"message": "Monthly Sales Prediction model trained successfully"})
 
 
-@app.route('/predict_sales', methods=['GET', 'POST'])
+@app.route('/predict_sales', methods=['GET'])
 def predict_sales():
-    months_ahead = request.args.get("months", default=6, type=int)
-    years_ahead = request.args.get("years", default=0, type=int)
+    selected_year = request.args.get("year", type=int)
+    selected_month = request.args.get("month", default=None, type=int)
+
+    if selected_year is None:
+        return jsonify({"error": "Year is required"}), 400
+
+    if selected_month is None:
+        months_to_predict = range(1, 13)
+    else:
+        months_to_predict = [selected_month]
 
     model = joblib.load(MODEL_FILE)
     scaler = joblib.load(SCALER_FILE)
@@ -97,10 +105,9 @@ def predict_sales():
     df = fetch_data()
     df['Year'] = df['Year'].astype(int)
     df['Month'] = df['Month'].astype(int)
+    min_year = df['Year'].min()
 
-    last_year = df['Year'].max()
-    last_month = df['Month'].max()
-    last_index = ((last_year - df['Year'].min()) * 12 + last_month)
+    month_index = (selected_year - min_year) * 12 + selected_month
 
     historical_avg = df.groupby('Month').agg({
         'TotalOrders':'mean',
@@ -110,37 +117,37 @@ def predict_sales():
         'AvgShippingTime':'mean'
     }).reset_index()
 
-    future = pd.DataFrame({"MonthIndex": [last_index + i for i in range(1, months_ahead + 1)]})
+    results = []
 
-    future_year_month = []
-    for i in range(1, months_ahead + 1):
-        month = last_month + i
-        year = last_year + (month - 1) // 12
-        month = ((month - 1) % 12) + 1
-        future_year_month.append((year, month))
+    for m in months_to_predict:
+        month_index = (selected_year - min_year) * 12 + m
 
-    future['Year'] = [y for (y, m) in future_year_month]
-    future['Month'] = [m for (y, m) in future_year_month]
-    future['Quarter'] = ((future['Month'] - 1) // 3 + 1)
-    future['IsHolidaySL'] = 0 
+        future = pd.DataFrame([{
+            "MonthIndex": month_index,
+            "Year": selected_year,
+            "Month": m,
+            "Quarter": (m - 1)//3 + 1,
+            "IsHolidaySL": 0,
+            "TotalOrders": historical_avg.loc[historical_avg['Month']==m, 'TotalOrders'].values[0],
+            "AvgUnitPrice": historical_avg.loc[historical_avg['Month']==m, 'AvgUnitPrice'].values[0],
+            "AvgDiscount": historical_avg.loc[historical_avg['Month']==m, 'AvgDiscount'].values[0],
+            "UniqueCustomers": historical_avg.loc[historical_avg['Month']==m, 'UniqueCustomers'].values[0],
+            "AvgShippingTime": historical_avg.loc[historical_avg['Month']==m, 'AvgShippingTime'].values[0]
+        }])
 
-    for col in ['TotalOrders', 'AvgUnitPrice', 'AvgDiscount', 'UniqueCustomers', 'AvgShippingTime']:
-        future[col] = future['Month'].apply(lambda m: historical_avg.loc[historical_avg['Month']==m, col].values[0])
+        X_future = future[X_columns]
+        X_future_scaled = scaler.transform(X_future)
+        preds = model.predict(X_future_scaled)
 
-    X_future = future[X_columns]
-    X_future_scaled = scaler.transform(X_future)
-
-    preds = model.predict(X_future_scaled)
-
-    results = [
-        {"Year": int(future.iloc[i]['Year']),
-         "Month": int(future.iloc[i]['Month']),
-         "Quarter": int(future.iloc[i]['Quarter']),
-         "PredictedSales": round(float(preds[i]), 2)}
-        for i in range(months_ahead)
-    ]
+        results.append({
+            "Year": selected_year,
+            "Month": selected_month,
+            "Quarter": future.iloc[0]['Quarter'],
+            "PredictedSales": round(float(preds[0]), 2)
+        })
 
     return jsonify(results)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
