@@ -119,7 +119,6 @@ def predict():
                 "PredictedSales": float(predicted_sales)
             })
 
-    results.sort(key=lambda x: (x["Year"], x["Month"]))
     return jsonify(results)
 
 if __name__ == "__main__":
