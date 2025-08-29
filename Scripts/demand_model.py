@@ -41,7 +41,16 @@ def fetch_monthly_demand():
             d.Month AS Month,
             ISNULL(d.Quarter, 0) AS Quarter,
             ISNULL(d.IsHolidaySL, 0) AS IsHolidaySL,
-            SUM(f.OrderQty) AS TotalQty
+            SUM(f.OrderQty) AS TotalQty,
+            COUNT(DISTINCT f.SalesOrderID) AS TotalOrders,
+            AVG(f.UnitPrice) AS AvgUnitPrice,
+            AVG(f.UnitPriceDiscount) AS AvgDiscount,
+            COUNT(DISTINCT f.CustomerKey) AS UniqueCustomers,
+            AVG(DATEDIFF(
+                DAY,
+                CAST(CONVERT(VARCHAR(8), f.OrderDateKey) AS DATE),
+                CAST(CONVERT(VARCHAR(8), f.ShipDateKey) AS DATE)
+            )) AS AvgShippingTime
         FROM FactSalesOrderDetail f
         JOIN DimDate d ON f.OrderDateKey = d.DateKey
         GROUP BY d.Year, d.Month, d.Quarter, d.IsHolidaySL
@@ -50,11 +59,13 @@ def fetch_monthly_demand():
     df = pd.read_sql(query, conn)
     conn.close()
 
-    df["Year"] = df["Year"].astype(int)
-    df["Month"] = df["Month"].astype(int)
-    df["Quarter"] = df["Quarter"].astype(int)
-    df["IsHolidaySL"] = df["IsHolidaySL"].astype(int)
-    df["TotalQty"] = df["TotalQty"].astype(float)
+    for col in ["Year", "Month", "Quarter", "IsHolidaySL"]:
+        df[col] = df[col].astype(int)
+    for col in ["TotalQty", "AvgUnitPrice", "AvgDiscount", "AvgShippingTime"]:
+        df[col] = df[col].astype(float)
+    for col in ["TotalOrders", "UniqueCustomers"]:
+        df[col] = df[col].astype(int)
+
     return df
 
 def add_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -68,7 +79,10 @@ def train_demand():
     df = fetch_monthly_demand()
     df = add_calendar_features(df)
 
-    feature_cols = ["Year", "Month", "Quarter", "IsHolidaySL", "MonthIndex"]
+    feature_cols = [
+        "Year", "Month", "Quarter", "IsHolidaySL", "MonthIndex",
+        "TotalOrders", "AvgUnitPrice", "AvgDiscount", "UniqueCustomers", "AvgShippingTime",
+    ]
     X = df[feature_cols]
     y = df["TotalQty"]
 
@@ -85,10 +99,7 @@ def train_demand():
     with open(COLUMNS_PATH, "wb") as f:
         pickle.dump(feature_cols, f)
 
-    return jsonify({"message": "Demand model trained successfully",
-                    "model_path": MODEL_PATH,
-                    "scaler_path": SCALER_PATH,
-                    "columns_path": COLUMNS_PATH})
+    return jsonify({"message": "Demand model trained successfully"})
 
 @app.route("/predict_demand", methods=['GET','POST'])
 def predict_demand():
@@ -126,6 +137,17 @@ def predict_demand():
         })
     future_df = pd.DataFrame(fut_rows)
 
+    historical_avg = hist.groupby("Month").agg({
+        "TotalOrders":"mean",
+        "AvgUnitPrice":"mean",
+        "AvgDiscount":"mean",
+        "UniqueCustomers":"mean",
+        "AvgShippingTime":"mean"
+    }).reset_index()
+
+    for col in ["TotalOrders", "AvgUnitPrice", "AvgDiscount", "UniqueCustomers", "AvgShippingTime"]:
+        future_df[col] = future_df["Month"].apply(lambda m: historical_avg.loc[historical_avg["Month"]==m, col].values[0])
+
     X_future = future_df[feature_cols]
     X_future_scaled = scaler.transform(X_future)
     preds = model.predict(X_future_scaled)
@@ -139,5 +161,5 @@ def predict_demand():
 
     return jsonify(results)
 
-# if __name__ == "__main__":
-#   app.run(debug=True)
+if __name__ == "__main__":
+  app.run(debug=True)

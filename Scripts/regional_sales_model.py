@@ -135,11 +135,8 @@ def predict():
             month_index = int((year - df['Year'].min())*12 + month)
             row.loc[0, 'MonthIndex'] = month_index
 
-            row.loc[0, 'TotalOrders'] = historical_avg.loc[historical_avg['Month']==month, 'TotalOrders'].values[0]
-            row.loc[0, 'AvgUnitPrice'] = historical_avg.loc[historical_avg['Month']==month, 'AvgUnitPrice'].values[0]
-            row.loc[0, 'AvgDiscount'] = historical_avg.loc[historical_avg['Month']==month, 'AvgDiscount'].values[0]
-            row.loc[0, 'UniqueCustomers'] = historical_avg.loc[historical_avg['Month']==month, 'UniqueCustomers'].values[0]
-            row.loc[0, 'AvgShippingTime'] = historical_avg.loc[historical_avg['Month']==month, 'AvgShippingTime'].values[0]
+            for col in ['TotalOrders', 'AvgUnitPrice', 'AvgDiscount', 'UniqueCustomers', 'AvgShippingTime']:
+                row.loc[0, col] = historical_avg.loc[historical_avg['Month']==month, col].values[0]
 
             predicted_sales = reg.predict(row)[0]
 
