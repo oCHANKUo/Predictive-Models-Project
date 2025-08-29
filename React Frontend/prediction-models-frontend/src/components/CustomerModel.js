@@ -11,9 +11,8 @@ function CustomerModel({ filters }) {
     try {
       const params = {};
       if (filters.topN && filters.topN > 0) {
-        params.top_n = filters.topN;  // priority
-      } else {
-        params.months = filters.month || 6;  // fallback if topN = 0
+        params.top_n = filters.topN; 
+        params.months = filters.month || 6;  
       }
 
       const res = await axios.get("http://localhost:5003/predict_customer", { params });
