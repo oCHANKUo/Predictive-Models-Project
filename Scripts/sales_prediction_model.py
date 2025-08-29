@@ -85,7 +85,7 @@ def train_model():
     return jsonify({"message": "Monthly Sales Prediction model trained successfully"})
 
 
-@app.route('/predict_sales', methods=['GET'])
+@app.route('/predict_sales', methods=['GET', 'POST'])
 def predict_sales():
     months_ahead = request.args.get("months", default=6, type=int)
     years_ahead = request.args.get("years", default=0, type=int)
