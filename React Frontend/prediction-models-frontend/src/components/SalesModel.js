@@ -10,7 +10,8 @@ function SalesModel({ filters }) {
     setLoading(true);
     try {
       const res = await axios.get("http://localhost:5000/predict_sales", {
-        params: { months: filters.month, years: filters.year }
+        params: { months: filters.month, 
+                  years: filters.year }
       });
       setResults(res.data);
     } catch (err) {
