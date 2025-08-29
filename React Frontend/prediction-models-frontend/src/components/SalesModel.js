@@ -6,13 +6,7 @@ function SalesModel({ filters }) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    // Trigger if a year is selected
-    if (filters.year) {
-      handlePredict();
-    }
-  }, [filters.year, filters.month]);
-
+  
 
   const handlePredict = async () => {
     setLoading(true);
