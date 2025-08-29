@@ -9,12 +9,14 @@ function RegionalSalesModel({ filters }) {
   const handlePredict = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("http://localhost:5001/predict_regional_sales", {
-        params: { 
-          months: filters.month || 6,  // use selected months, fallback = 6
-          TerritoryName: filters.territory || undefined 
-        }
-      });
+      const params = {
+        months: filters.month ? 1 : filters.month || 6, // if month is selected, predict only 1 month
+        TerritoryName: filters.territory || undefined,
+        year: filters.year || undefined,
+        month: filters.month || undefined
+      };
+
+      const res = await axios.get("http://localhost:5001/predict_regional_sales",{ params });
       setResults(res.data);
     } catch (err) {
       console.error(err);

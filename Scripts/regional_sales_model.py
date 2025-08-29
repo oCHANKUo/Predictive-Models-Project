@@ -113,7 +113,8 @@ def predict():
         'AvgShippingTime':'mean'
     }).reset_index()
 
-    territory_input = request.form.get("TerritoryName") or request.args.get("TerritoryName")
+    # Territory filter
+    territory_input = request.args.get("TerritoryName")
     data = request.get_json(silent=True)
     territory_input = territory_input or (data.get("TerritoryName") if data else None)
     territories = [territory_input] if territory_input else df['TerritoryName'].unique()
@@ -128,6 +129,7 @@ def predict():
 
             row = pd.DataFrame(0, index=[0], columns=columns)
 
+            # One-hot territory column
             terr_col = [c for c in columns if terr in c]
             if terr_col:
                 row.loc[0, terr_col] = 1
