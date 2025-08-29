@@ -64,25 +64,29 @@ def train_rf_model():
     df['IsHolidaySL'] = df['IsHolidaySL'].astype(int)
     df['TotalSales'] = df['TotalSales'].astype(float)
 
+    # Add MonthIndex to capture time trend
     df['MonthIndex'] = (df['Year'] - df['Year'].min()) * 12 + df['Month']
 
-    X = df[['MonthIndex', 'Month', 'Quarter', 'IsHolidaySL',
+    # Define features and target
+    X = df[['Year','MonthIndex', 'Month', 'Quarter', 'IsHolidaySL',
             'TotalOrders', 'AvgUnitPrice', 'AvgDiscount', 'UniqueCustomers', 'AvgShippingTime']]
     y = df['TotalSales']
 
+    # Scale features
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # Random Forest model
+    # Train Random Forest
     rf_model = RandomForestRegressor(n_estimators=200, random_state=42)
     rf_model.fit(X_scaled, y)
 
-    # Save the RF model, scaler, and columns
+    # Save model, scaler, and columns
     joblib.dump(rf_model, RF_MODEL_FILE)
     joblib.dump(scaler, RF_SCALER_FILE)
     joblib.dump(X.columns, RF_X_COLUMNS_FILE)
 
     return jsonify({"message": "Random Forest Sales Prediction model trained successfully"})
+
 
 @app.route('/predict_sales_rf', methods=['GET', 'POST'])
 def predict_sales_rf():
@@ -97,53 +101,56 @@ def predict_sales_rf():
     else:
         months_to_predict = [selected_month]
 
+    # Load trained model
     model = joblib.load(RF_MODEL_FILE)
     scaler = joblib.load(RF_SCALER_FILE)
     X_columns = joblib.load(RF_X_COLUMNS_FILE)
 
+    # Fetch full training data
     df = fetch_data()
     df['Year'] = df['Year'].astype(int)
     df['Month'] = df['Month'].astype(int)
-    min_year = df['Year'].min()
+    df['Quarter'] = df['Quarter'].astype(int)
+    df['IsHolidaySL'] = df['IsHolidaySL'].astype(int)
+    df['TotalSales'] = df['TotalSales'].astype(float)
 
-    historical_avg = df.groupby('Month').agg({
-        'TotalOrders':'mean',
-        'AvgUnitPrice':'mean',
-        'AvgDiscount':'mean',
-        'UniqueCustomers':'mean',
-        'AvgShippingTime':'mean'
-    }).reset_index()
+    # Add MonthIndex for trend
+    min_year = df['Year'].min()
+    df['MonthIndex'] = (df['Year'] - min_year) * 12 + df['Month']
 
     results = []
 
     for m in months_to_predict:
-        month_index = (selected_year - min_year) * 12 + m
+        # Try to get actual feature values for that year/month
+        row = df[(df['Year'] == selected_year) & (df['Month'] == m)]
 
-        future = pd.DataFrame([{
-            "MonthIndex": month_index,
-            "Year": selected_year,
-            "Month": m,
-            "Quarter": (m - 1)//3 + 1,
-            "IsHolidaySL": 0,
-            "TotalOrders": historical_avg.loc[historical_avg['Month']==m, 'TotalOrders'].values[0],
-            "AvgUnitPrice": historical_avg.loc[historical_avg['Month']==m, 'AvgUnitPrice'].values[0],
-            "AvgDiscount": historical_avg.loc[historical_avg['Month']==m, 'AvgDiscount'].values[0],
-            "UniqueCustomers": historical_avg.loc[historical_avg['Month']==m, 'UniqueCustomers'].values[0],
-            "AvgShippingTime": historical_avg.loc[historical_avg['Month']==m, 'AvgShippingTime'].values[0]
-        }])
+        if not row.empty:
+            # Use actual historical data if available
+            future = row.iloc[0][X_columns].to_frame().T
+        else:
+            # Fallback: use mean of that month across years
+            monthly_mean = df[df['Month'] == m][X_columns].mean()
+            future = monthly_mean.to_frame().T
+            # Update year + month + monthIndex
+            future["Year"] = selected_year
+            future["Month"] = m
+            future["MonthIndex"] = (selected_year - min_year) * 12 + m
+            future["Quarter"] = (m - 1) // 3 + 1
+            future["IsHolidaySL"] = 0
 
-        X_future = future[X_columns]
-        X_future_scaled = scaler.transform(X_future)
+        # Scale and predict
+        X_future_scaled = scaler.transform(future[X_columns])
         preds = model.predict(X_future_scaled)
 
         results.append({
-            "Year": selected_year,
-            "Month": m,
-            "Quarter": future.iloc[0]['Quarter'],
+            "Year": int(selected_year),
+            "Month": int(m),
+            "Quarter": int(future["Quarter"].values[0]),
             "PredictedSales": round(float(preds[0]), 2)
         })
 
     return jsonify(results)
+
 
 
 if __name__ == '__main__':

@@ -68,7 +68,7 @@ def train_model():
 
     df['MonthIndex'] = (df['Year'] - df['Year'].min()) * 12 + df['Month']
 
-    X = df[['MonthIndex', 'Month', 'Quarter', 'IsHolidaySL',
+    X = df[['Year', 'MonthIndex', 'Month', 'Quarter', 'IsHolidaySL',
             'TotalOrders', 'AvgUnitPrice', 'AvgDiscount', 'UniqueCustomers', 'AvgShippingTime']]
     y = df['TotalSales']
 
