@@ -108,6 +108,7 @@ def predict_customer():
     if not os.path.exists(CUSTOMER_MODEL_FILE):
         return jsonify({"error": "Model not trained. Call /train_customer first"}), 400
 
+    # Load model, scaler, and columns
     with open(CUSTOMER_MODEL_FILE, "rb") as f:
         model = pickle.load(f)
     with open(CUSTOMER_SCALER_FILE, "rb") as f:
@@ -115,9 +116,11 @@ def predict_customer():
     with open(CUSTOMER_COLUMNS_FILE, "rb") as f:
         columns = pickle.load(f)
 
+    # Prepare customer data
     df = fetch_customer_data()
     X, _, full_df, _, _ = prepare_customer_data(df, fit_scaler=False, scaler=scaler, columns=columns)
 
+    # Predict
     preds = model.predict_proba(X)[:, 1]
     full_df['PurchaseProbability'] = preds
     full_df['Prediction'] = (preds > 0.5).astype(int)
@@ -133,6 +136,7 @@ def predict_customer():
     if selected_month:
         latest = latest[latest['Month'] == selected_month]
 
+    # Keep only the latest entry per customer
     latest = latest.groupby("CustomerKey").tail(1)
 
     top_n = request.args.get("top_n", default=10, type=int)
