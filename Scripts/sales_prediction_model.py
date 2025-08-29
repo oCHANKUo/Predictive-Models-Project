@@ -36,7 +36,16 @@ def fetch_data():
         d.Month,
         ISNULL(d.Quarter, 0) AS Quarter,
         ISNULL(d.IsHolidaySL, 0) AS IsHolidaySL,
-        SUM(f.LineTotal) AS TotalSales
+        SUM(f.LineTotal) AS TotalSales,
+        COUNT(DISTINCT f.SalesOrderID) AS TotalOrders,
+        AVG(f.UnitPrice) AS AvgUnitPrice,
+        AVG(f.UnitPriceDiscount) AS AvgDiscount,
+        COUNT(DISTINCT f.CustomerKey) AS UniqueCustomers,
+        AVG(DATEDIFF(
+            DAY, 
+            CAST(CONVERT(VARCHAR(8), f.OrderDateKey) AS DATE), 
+            CAST(CONVERT(VARCHAR(8), f.ShipDateKey) AS DATE)
+        )) AS AvgShippingTime
     FROM FactSalesOrderDetail f
     JOIN DimDate d ON f.OrderDateKey = d.DateKey
     GROUP BY d.Year, d.Month, d.Quarter, d.IsHolidaySL
@@ -59,7 +68,8 @@ def train_model():
 
     df['MonthIndex'] = (df['Year'] - df['Year'].min()) * 12 + df['Month']
 
-    X = df[['MonthIndex', 'Month', 'Quarter', 'IsHolidaySL']]
+    X = df[['MonthIndex', 'Month', 'Quarter', 'IsHolidaySL',
+            'TotalOrders', 'AvgUnitPrice', 'AvgDiscount', 'UniqueCustomers', 'AvgShippingTime']]
     y = df['TotalSales']
 
     scaler = StandardScaler()
@@ -77,8 +87,8 @@ def train_model():
 
 @app.route('/predict_sales', methods=['GET'])
 def predict_sales():
-    months_ahead = request.args.get("months", type=int)
-    years_ahead = request.args.get("years", type=int)
+    months_ahead = request.args.get("months", default=6, type=int)
+    years_ahead = request.args.get("years", default=0, type=int)
 
     model = joblib.load(MODEL_FILE)
     scaler = joblib.load(SCALER_FILE)
@@ -91,6 +101,14 @@ def predict_sales():
     last_year = df['Year'].max()
     last_month = df['Month'].max()
     last_index = ((last_year - df['Year'].min()) * 12 + last_month)
+
+    historical_avg = df.groupby('Month').agg({
+        'TotalOrders':'mean',
+        'AvgUnitPrice':'mean',
+        'AvgDiscount':'mean',
+        'UniqueCustomers':'mean',
+        'AvgShippingTime':'mean'
+    }).reset_index()
 
     future = pd.DataFrame({"MonthIndex": [last_index + i for i in range(1, months_ahead + 1)]})
 
@@ -105,6 +123,9 @@ def predict_sales():
     future['Month'] = [m for (y, m) in future_year_month]
     future['Quarter'] = ((future['Month'] - 1) // 3 + 1)
     future['IsHolidaySL'] = 0 
+
+    for col in ['TotalOrders', 'AvgUnitPrice', 'AvgDiscount', 'UniqueCustomers', 'AvgShippingTime']:
+        future[col] = future['Month'].apply(lambda m: historical_avg.loc[historical_avg['Month']==m, col].values[0])
 
     X_future = future[X_columns]
     X_future_scaled = scaler.transform(X_future)
