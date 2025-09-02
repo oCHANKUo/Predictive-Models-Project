@@ -71,7 +71,7 @@ def train_sales_rf():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/predict_sales_rf', methods=['GET'])
+@app.route('/predict_sales_rf', methods=['GET', 'POST'])
 def predict_sales():
     if not os.path.exists(MODEL_FILE):
         return jsonify({"error": "Model not trained yet. Call /train_sales_rf first."}), 400
