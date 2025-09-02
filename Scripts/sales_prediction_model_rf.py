@@ -71,41 +71,49 @@ def train_sales_rf():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/predict_sales_rf', methods=['GET', 'POST'])
+@app.route('/predict_sales_rf', methods=['GET'])
 def predict_sales():
-        if not os.path.exists(MODEL_FILE):
-            return jsonify({"error": "Model not trained yet. Call /train_sales_rf first."}), 400
-        
+    if not os.path.exists(MODEL_FILE):
+        return jsonify({"error": "Model not trained yet. Call /train_sales_rf first."}), 400
+
+    try:
         rf = joblib.load(MODEL_FILE)
-    
-        selected_year = request.args.get("year", type=int, default=2015)
-        selected_month = request.args.get("month", default=None, type=int)
-        is_holiday = request.args.get("isholiday", default=0, type=int)
-        total_orders = request.args.get("totalorders", default=100, type=float)
-        avg_price = request.args.get("avgprice", default=50, type=float)
-        avg_discount = request.args.get("avgdiscount", default=0, type=float)
-        unique_customers = request.args.get("uniquecustomers", default=50, type=float)
-        avg_ship_time = request.args.get("avgshiptime", default=3, type=float)
         
-        if selected_year is None:
-            return jsonify({"error": "Year is required"}), 400
-        
+        selected_year = request.args.get("year", type=int, default=2025)
+        selected_month = request.args.get("month", type=int, default=None)
+
+        df = fetch_data()
+        avg_values = df[['IsHolidaySL', 'TotalOrders', 'AvgUnitPrice', 
+                         'AvgDiscount', 'UniqueCustomers', 'AvgShippingTime']].mean()
+
         months_to_predict = [selected_month] if selected_month else list(range(1, 13))
-        
+
         results = []
         for m in months_to_predict:
             quarter = ((m-1)//3) + 1
-            X_pred = [[selected_year, m, quarter, is_holiday, total_orders,
-                       avg_price, avg_discount, unique_customers, avg_ship_time]]
+            X_pred = [[
+                selected_year,
+                m,
+                quarter,
+                avg_values['IsHolidaySL'],
+                avg_values['TotalOrders'],
+                avg_values['AvgUnitPrice'],
+                avg_values['AvgDiscount'],
+                avg_values['UniqueCustomers'],
+                avg_values['AvgShippingTime']
+            ]]
             pred = rf.predict(X_pred)
             results.append({
-                "Year": int(selected_year),
-                "Month": int(m),
-                "Quarter": int(quarter),
+                "Year": selected_year,
+                "Month": m,
+                "Quarter": quarter,
                 "PredictedSales": float(round(pred[0], 2))
             })
-        
+
         return jsonify(results)
 
-# if __name__ == "__main__":
-#     app.run(debug=True, port=5000)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5000)
